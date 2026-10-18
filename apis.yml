@@ -1,6 +1,9 @@
 aid: knoxcall
 name: KnoxCall
-description: 'KnoxCall provides a secure API key management platform that stores third‑party API keys (such as Stripe, OpenAI, and many others) and injects them at egress. This enables applications, CI pipelines, and AI agents to use revocable tokens instead of permanent credentials, reducing risk of key leakage. The service offers features like token revocation, usage monitoring, and integration with popular developer tools, helping teams protect their secret keys while maintaining seamless access to external services.'
+description: KnoxCall provides a secure API key management platform that stores third‑party API keys (such as Stripe, OpenAI, and many others)
+  and injects them at egress. This enables applications, CI pipelines, and AI agents to use revocable tokens instead of permanent credentials,
+  reducing risk of key leakage. The service offers features like token revocation, usage monitoring, and integration with popular developer tools,
+  helping teams protect their secret keys while maintaining seamless access to external services.
 url: https://raw.githubusercontent.com/api-evangelist/knoxcall/refs/heads/main/apis.yml
 x-type: company
 x-source: harvest:g2-catalog
@@ -16,13 +19,12 @@ tags:
 - DevOps
 - AI-Agents
 apis:
-  - name: KnoxCall API
-    description: "Client Management API for KnoxCall"
-    humanURL: https://docs.knoxcall.com/api-reference
-    baseURL: https://api.knoxcall.com/v1
-    properties:
-      - type: OpenAPI
-        url: openapi/knoxcall-openapi.json
+- name: KnoxCall API
+  description: Client Management API for KnoxCall
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  properties: []
+  aid: knoxcall:knoxcall-api
 maintainers:
 - FN: Kin Lane
   email: kin@apievangelist.com
@@ -45,3 +47,19 @@ common:
   url: https://knoxcall.com/terms
 - type: PrivacyPolicy
   url: https://knoxcall.com/privacy
+- type: DeveloperPortal
+  url: https://docs.knoxcall.com/
+- type: Documentation
+  url: https://docs.knoxcall.com/
+- type: APIReference
+  url: https://docs.knoxcall.com/api-reference
+- type: GettingStarted
+  url: https://docs.knoxcall.com/getting-started
+- type: Support
+  url: https://docs.knoxcall.com/support
+- type: Roadmap
+  url: https://knoxcall.com/roadmap
+- type: SignUp
+  url: https://knoxcall.com/register
+- type: Postman
+  url: https://www.postman.com/knoxcall/workspace

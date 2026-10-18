@@ -8,6 +8,18 @@ hosts:
   cert_expires: Dec 22 06:32:12 2026 GMT
   hsts: true
   hsts_max_age: 63072000
+- host: docs.knoxcall.com
+  https: true
+  tls_version: TLSv1.3
+  cert_expires: Dec  4 20:53:59 2026 GMT
+  hsts: true
+  hsts_max_age: 63072000
+- host: api.knoxcall.com
+  https: true
+  tls_version: TLSv1.3
+  cert_expires: Dec 22 06:32:12 2026 GMT
+  hsts: true
+  hsts_max_age: 63072000
 domains:
 - domain: knoxcall.com
   dnssec: false
