@@ -1,0 +1,2279 @@
+openapi: 3.2.0
+info:
+  title: KnoxCall Client Management Routes API
+  version: '1.0'
+  description: 'The KnoxCall Client Management API provides programmatic access to manage your API gateway
+
+    resources including routes, secrets, clients, environments, webhooks, and API keys. ## Authentication
+
+
+    All requests must include an OAuth 2.1 access token **or** a legacy API key. The
+
+    recommended path for new integrations is the first-party SDKs, which mint, cache, and
+
+    refresh OAuth tokens for you (start with `knoxcall login` on a developer machine, or
+
+    `KNOXCALL_CLIENT_ID` / `KNOXCALL_CLIENT_SECRET` in CI). You can authenticate using any of:
+
+
+    - **Authorization header (OAuth 2.1 bearer token — recommended)**: `Authorization: Bearer `
+
+    - **Authorization header (legacy API key)**: `Authorization: Bearer tk_xxx_yyy`
+
+    - **x-api-key header (legacy API key)**: `x-api-key: tk_xxx_yyy`
+
+
+    OAuth 2.1 access tokens (`kc_` prefix) are minted at the root-host token endpoint
+
+    `https://api.knoxcall.com/oauth/token` (not under `/v1`) using the `client_credentials`
+
+    or `authorization_code` grant. See the `OAuth2` security scheme and the `/oauth/*`
+
+    endpoints. Some resources that are managed exclusively through OAuth reject API-key auth
+
+    with a `403 use_oauth` error. Long-lived API keys remain fully supported. They come in three types:
+
+    - **Standard keys** (`tk_` prefix) are used on the production API (`api.knoxcall.com`). - **Test keys** (`tk_` prefix, type=test) are used on the sandbox API (`sandbox.knoxcall.com`). - **Enterprise Access Keys** (`AKE` prefix) follow the format `AKE[16chars]:[40chars]`. Using a test key on the production API (or vice versa) will return a `403 wrong_key_type` error. ## Request IDs
+
+
+    Every response — success or error — includes an `X-Request-Id` response header (a UUID). Its value is identical to the `request_id` field in the response body (`meta.request_id`
+
+    on success, `error.request_id` on error). Quote it when contacting support. ## API Versioning
+
+
+    The API is versioned on two axes:
+
+
+    - **Major version — the `/v1` path prefix.** Breaking changes ship under a new major
+
+    (`/v2`). `/v1` never receives a breaking change. - **Minor version — the `KnoxCall-Version` header (dated, `YYYY-MM-DD`).** Send
+
+    `KnoxCall-Version: 2026-08-05` to pin the behaviour of a specific dated release. Omit
+
+    the header to get the newest minor version. Every response echoes the resolved version
+
+    back in a `KnoxCall-Version` response header. Within a major version, **additive changes are not breaking** and may appear without a new
+
+    dated version: new endpoints, new optional request fields, new response fields, new
+
+    `error.type` values, and new enum members. Clients must tolerate unknown response fields
+
+    and unknown `error.type` values (see the `ErrorResponse` schema). An **unknown or malformed** `KnoxCall-Version` value returns `400` with
+
+    `error.type: invalid_api_version`. ## Rate Limiting
+
+
+    API keys can have optional rate limits configured. When a limit is configured, the
+
+    following headers are emitted on **every** response (not only `429`s):
+
+    - `X-RateLimit-Limit` -- maximum requests allowed per window
+
+    - `X-RateLimit-Remaining` -- remaining requests in the current window
+
+    - `X-RateLimit-Reset` -- epoch seconds at which the window resets
+
+
+    When the limit is exceeded the API returns `429` (`rate_limit_exceeded` / `rate_limited`)
+
+    and additionally sets `Retry-After` (seconds until the window resets). ## DPoP sender-constrained tokens, and the server nonce
+
+
+    A token minted with a `cnf.jkt` binding (DPoP, RFC 9449) requires a `DPoP` proof header
+
+    on every request, signed over the request''s method and canonical public URL. **Every response to a request that carried a `DPoP` header also carries a
+
+    `DPoP-Nonce` response header** -- mints, refusals and successful calls alike, on
+
+    `POST /oauth/token`, `/v1`, the tenant data plane, the self-hosted proxy and the AI
+
+    gateway. The value is stateless and changes every minute; the server accepts the current
+
+    and the previous minute''s, so a nonce is good for 60-120 seconds.'
+  contact:
+    name: KnoxCall Support
+    url: https://knoxcall.com
+    email: support@knoxcall.com
+  license:
+    name: Proprietary
+    url: https://knoxcall.com/terms
+servers:
+- url: https://api.knoxcall.com/v1
+  description: Production
+- url: https://sandbox.knoxcall.com/v1
+  description: Sandbox (test keys only)
+security:
+- OAuth2: []
+- BearerAuth: []
+- ApiKeyAuth: []
+tags:
+- name: Routes
+  description: Manage proxy routes that forward API requests to upstream targets.
+paths:
+  /routes:
+    get:
+      operationId: listRoutes
+      summary: List routes
+      description: Returns a paginated list of routes belonging to the authenticated account.
+      tags:
+      - Routes
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      - $ref: '#/components/parameters/SortParam'
+      - $ref: '#/components/parameters/OrderParam'
+      - $ref: '#/components/parameters/EnabledParam'
+      - $ref: '#/components/parameters/ApiVersionParam'
+      responses:
+        '200':
+          description: A paginated list of routes.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RouteSummary'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createRoute
+      summary: Create a route
+      description: 'Creates a new proxy route. The route name must be unique within your account.
+
+        The route will be created in the specified `base_environment` (defaults to `production`).'
+      tags:
+      - Routes
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyParam'
+      - $ref: '#/components/parameters/ApiVersionParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteRequest'
+            example:
+              name: stripe-payments
+              target_base_url: https://api.stripe.com
+              base_environment: production
+              inject_headers_json:
+                Authorization: Bearer {{STRIPE_SECRET_KEY}}
+      responses:
+        '200':
+          description: The created route.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+            X-Idempotent-Replay:
+              $ref: '#/components/headers/X-Idempotent-Replay'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Route'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '409':
+          description: 'Two refusals share this status; `error.type` tells them apart. `conflict` —
+
+            a route with this name or slug already exists in this tenant and data space.
+
+            `intercept_route_conflict` — `intercept_enabled: true` was requested and another
+
+            intercept-enabled route already covers the same upstream host and base path in the
+
+            base environment (only one route may take a host''s traffic).
+
+            '
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            KnoxCall-Version:
+              $ref: '#/components/headers/KnoxCall-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                conflict:
+                  value:
+                    error:
+                      type: conflict
+                      message: A route with this name already exists.
+                intercept_route_conflict:
+                  value:
+                    error:
+                      type: intercept_route_conflict
+                      message: Route "hubspot-crm" already intercepts api.hubapi.com/crm/v3 in production. Turn Intercept off on that route first, or leave it off on this one.
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReuse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /routes/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RouteId'
+    get:
+      operationId: getRoute
+      summary: Get route details
+      description: Returns full details of a single route, including configured environment names.
+      tags:
+      - Routes
+      responses:
+        '200':
+          description: Route details.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RouteDetail'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateRoute
+      summary: Update a route
+      description: 'Updates one or more fields on an existing route. Only provided fields are changed.
+
+
+        **A route that decrypts or detokenizes.** When the route carries a standing `decrypt` or
+
+        `detokenize` field action (`POST /routes/{routeId}/actions`, either direction), giving it
+
+        a NEW destination — a `target_base_url` or per-method `target_url` it does not already
+
+        store, or switching on one it stores but does not send to (`enabled: true` on a disabled
+
+        environment, an idle URL copied into the base URL) — sends the opened values to that host
+
+        on every later call, so it needs what
+
+        attaching the action needed: a token issued to a person (knoxcall login, a device or
+
+        authorization-code grant) is refused (`403 forbidden`); a machine credential must hold the
+
+        action''s own permission (`transit:decrypt` on the action''s key, `vaults:detokenize` on its
+
+        vault — `403 forbidden` from the key''s policy, `403 insufficient_scope` for a narrowed
+
+        token). Re-sending a URL the route already stores, removing one, and every route without
+
+        such an action are unaffected. The change is recorded in the audit log
+
+        (`route.destination_change`) before it is written. Make it from the dashboard as an Owner
+
+        or Admin (a fresh second factor is asked) when no machine credential holds the permission.'
+      tags:
+      - Routes
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRouteRequest'
+            example:
+              enabled: false
+              rate_limit_enabled: true
+              rate_limit_requests: 100
+              rate_limit_window_sec: 60
+      responses:
+        '200':
+          description: The updated route.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Route'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/RouteDestinationLocked'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 'Two refusals share this status; `error.type` tells them apart. `request_in_progress` —
+
+            a request with the same idempotency key is still being processed: retry after a short delay without changing the body.
+
+            `intercept_route_conflict` — `intercept_enabled: true` was requested and another
+
+            intercept-enabled route already covers the same upstream host and base path in the
+
+            base environment (only one route may take a host''s traffic).
+
+            '
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            KnoxCall-Version:
+              $ref: '#/components/headers/KnoxCall-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                request_in_progress:
+                  value:
+                    error:
+                      type: request_in_progress
+                      message: A request with this idempotency key is still being processed.
+                intercept_route_conflict:
+                  value:
+                    error:
+                      type: intercept_route_conflict
+                      message: Route "hubspot-crm" already intercepts api.hubapi.com/crm/v3 in production. Turn Intercept off on that route first, or leave it off on this one.
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReuse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteRoute
+      summary: Delete a route
+      description: Permanently deletes a route and all of its environment overrides.
+      tags:
+      - Routes
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyParam'
+      responses:
+        '200':
+          description: Route deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/RequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReuse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /routes/{id}/logs:
+    parameters:
+    - $ref: '#/components/parameters/RouteId'
+    get:
+      operationId: getRouteLogs
+      summary: Get route request logs
+      description: Returns a paginated list of proxied request logs for the specified route, ordered by timestamp descending.
+      tags:
+      - Routes
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of request logs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RequestLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /routes/{id}/environments:
+    parameters:
+    - $ref: '#/components/parameters/RouteId'
+    get:
+      operationId: listRouteEnvironments
+      summary: List route environment overrides
+      description: Returns all environment-specific configuration overrides for a route.
+      tags:
+      - Routes
+      responses:
+        '200':
+          description: List of environment overrides.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RouteEnvironmentConfig'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /routes/{id}/environments/{env}:
+    parameters:
+    - $ref: '#/components/parameters/RouteId'
+    - name: env
+      in: path
+      required: true
+      schema:
+        type: string
+      description: The environment name (e.g. `staging`, `production`).
+      example: staging
+    put:
+      operationId: setRouteEnvironment
+      summary: Set environment override
+      description: 'Creates or updates an environment-specific configuration override for a route.
+
+        The environment must already exist in your account. Fields not provided will retain
+
+        their existing values on update, or be null on initial creation.
+
+
+        **A route that decrypts or detokenizes.** When the route carries a standing `decrypt` or
+
+        `detokenize` field action (`POST /routes/{routeId}/actions`, either direction), giving it
+
+        a NEW destination — a `target_base_url` or per-method `target_url` it does not already
+
+        store, or switching on one it stores but does not send to (`enabled: true` on a disabled
+
+        environment, an idle URL copied into the base URL) — sends the opened values to that host
+
+        on every later call, so it needs what
+
+        attaching the action needed: a token issued to a person (knoxcall login, a device or
+
+        authorization-code grant) is refused (`403 forbidden`); a machine credential must hold the
+
+        action''s own permission (`transit:decrypt` on the action''s key, `vaults:detokenize` on its
+
+        vault — `403 forbidden` from the key''s policy, `403 insufficient_scope` for a narrowed
+
+        token). Re-sending a URL the route already stores, removing one, and every route without
+
+        such an action are unaffected. The change is recorded in the audit log
+
+        (`route.destination_change`) before it is written. Make it from the dashboard as an Owner
+
+        or Admin (a fresh second factor is asked) when no machine credential holds the permission.'
+      tags:
+      - Routes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteEnvironmentConfigInput'
+            example:
+              target_base_url: https://api-staging.stripe.com
+              inject_headers_json:
+                Authorization: Bearer {{STRIPE_TEST_KEY}}
+      responses:
+        '200':
+          description: The environment override.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RouteEnvironmentConfig'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/RouteDestinationLocked'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/InterceptRouteConflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteRouteEnvironment
+      summary: Remove environment override
+      description: Deletes an environment-specific configuration override, reverting the route to its base configuration for that environment.
+      tags:
+      - Routes
+      responses:
+        '200':
+          description: Environment override removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /routes/{routeId}/actions:
+    parameters:
+    - name: routeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The route UUID.
+    get:
+      operationId: listRouteActions
+      summary: List route field-actions
+      description: 'Returns the declarative field-level encrypt/decrypt/tokenize/detokenize
+
+        actions the proxy applies to this route, ordered for execution.'
+      tags:
+      - Routes
+      responses:
+        '200':
+          description: List of route actions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RouteAction'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createRouteAction
+      summary: Create a route field-action
+      description: 'Adds a field-level action to a route. On each proxied request (or
+
+        response), the selectors are matched against the payload and the
+
+        configured action is applied to the selected fields on the wire.
+
+        `tokenize` / `detokenize` actions require `key_name` (the vault name);
+
+        `encrypt` / `decrypt` default to the tenant''s default transit key when
+
+        `key_name` is omitted.
+
+
+        **Scope depends on the `action` in the body.** A route action is a
+
+        STANDING grant: once stored, every request through the route runs it
+
+        unattended. So `action: detokenize` additionally requires
+
+        `vaults:detokenize` (or `vaults:*`) and `action: decrypt` additionally
+
+        requires `transit:decrypt` (or `transit:*`) on the access token''s grant —
+
+        the same scopes the equivalent one-shot calls require. `encrypt` and
+
+        `tokenize` stay on `routes:write`: both close data and neither reads
+
+        anything back. A token narrowed to `routes:write` that asks for a
+
+        `detokenize` or `decrypt` action receives `403 insufficient_scope` and
+
+        nothing is written. API keys and key-mirrored clients carry no scope
+
+        grant and are unaffected. Changed 2026-09-12.'
+      tags:
+      - Routes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteActionRequest'
+            example:
+              direction: request
+              action: tokenize
+              selectors:
+              - $.card.number
+              key_name: payments-vault
+      responses:
+        '200':
+          description: The created route action.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RouteAction'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /routes/{routeId}/actions/{actionId}:
+    parameters:
+    - name: routeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The route UUID.
+    - name: actionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The route action UUID.
+    delete:
+      operationId: deleteRouteAction
+      summary: Delete a route field-action
+      description: Removes a field-level action from a route.
+      tags:
+      - Routes
+      responses:
+        '200':
+          description: Route action deleted. `deleted` echoes the action ID.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: string
+                        description: The deleted action's ID.
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  schemas:
+    RouteAction:
+      type: object
+      description: A declarative field-level action the proxy applies to a route's traffic on the wire.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 7f3b9c2a-1d4e-4f6a-8b0c-2e5d7a9c1b3f
+        route_id:
+          type: string
+          format: uuid
+          description: The route this action is attached to.
+        tenant_id:
+          type: string
+          format: uuid
+        direction:
+          type: string
+          enum:
+          - request
+          - response
+          description: Whether the action runs on the proxied request or the upstream response.
+          example: request
+        action:
+          type: string
+          enum:
+          - encrypt
+          - decrypt
+          - tokenize
+          - detokenize
+          description: The transformation applied to the selected fields.
+          example: tokenize
+        selectors:
+          type: array
+          items:
+            type: string
+          description: 'JSONPath-style selectors matched against the payload. A `tokenize` selector must land on a JSON scalar (string, number or boolean): the vault tokenizes a string, so a selected object or array is REFUSED (`relay_field_not_scalar`, 422 on the request half and 502 on the response half) rather than forwarded with the value untransformed. An explicitly-`null` field is a no-op — there is nothing to protect.'
+          example:
+          - $.card.number
+        key_name:
+          type:
+          - string
+          - 'null'
+          description: Transit key or vault name used by the action. Null for encrypt/decrypt means the tenant's default transit key.
+          example: payments-vault
+        data_role:
+          type:
+          - string
+          - 'null'
+          description: Optional data-role constraint enforced during crypto operations.
+        content_type:
+          type: string
+          description: 'Media type this action applies to, stored canonically (parameters such as `; charset=utf-8` are stripped, and the value is lowercased). ENFORCED by the proxy: a request whose `Content-Type`, or an upstream reply whose `Content-Type`, is not this media type is REFUSED (`relay_unsupported_content_type`, 415 on the request half and 502 on the response half) rather than forwarded with the action silently skipped.'
+          example: application/json
+        sort_order:
+          type: integer
+          description: Execution order within the same direction (lower runs first).
+          example: 0
+        enabled:
+          type: boolean
+          example: true
+    CreateRouteActionRequest:
+      type: object
+      required:
+      - direction
+      - action
+      - selectors
+      properties:
+        direction:
+          type: string
+          enum:
+          - request
+          - response
+          description: Whether the action runs on the proxied request or the upstream response.
+        action:
+          type: string
+          enum:
+          - encrypt
+          - decrypt
+          - tokenize
+          - detokenize
+          description: The transformation to apply.
+        selectors:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: 'JSONPath-style selectors matched against the payload. At least one is required. A `tokenize` selector must land on a JSON scalar (string, number or boolean): the vault tokenizes a string, so a selected object or array is REFUSED (`relay_field_not_scalar`, 422 on the request half and 502 on the response half) rather than forwarded with the value untransformed. An explicitly-`null` field is a no-op — there is nothing to protect.'
+          example:
+          - $.card.number
+        key_name:
+          type: string
+          description: 'Vault name (required for `tokenize`/`detokenize`) or transit key name
+
+            (optional for `encrypt`/`decrypt` — defaults to the tenant''s default key).
+
+
+            Platform-reserved key names are refused with `403 reserved_key_name`: any
+
+            name in the `__` namespace (a vault''s internal backing key, the OAuth JWT
+
+            signing key), plus `kc-default` on `encrypt`/`decrypt`, which is the
+
+            auto-provisioned default key the keyless form already uses.
+
+            '
+          example: payments-vault
+        data_role:
+          type: string
+          description: Optional data-role constraint enforced during crypto operations.
+        content_type:
+          type: string
+          default: application/json
+          description: 'Media type this action applies to. Stored canonically — parameters such as `; charset=utf-8` are stripped and the value is lowercased — and validated as a `type/subtype` media type. The proxy ENFORCES it: traffic that does not carry this media type is refused with `relay_unsupported_content_type` (415 on the request half, 502 on the response half), never forwarded with the field action skipped.'
+        sort_order:
+          type: integer
+          default: 0
+          description: Execution order within the same direction (lower runs first).
+    RouteDetail:
+      type: object
+      description: 'Route detail as returned by `GET /routes/{id}`. The
+
+        `payload_structure`, `injection_rules`, `ip_allowlist`, and
+
+        `data_plane_node_id` fields are present only when the route has a
+
+        base-environment configuration row. `injection_rules` is deprecated and
+
+        is applied to no request — see the field''s own description.
+
+        '
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: stripe-payments
+        slug:
+          type:
+          - string
+          - 'null'
+          description: Write-once machine handle for code references. Null when unset.
+        target_base_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: Derived read-only view of the base environment's target URL.
+          example: https://api.stripe.com
+        base_environment:
+          type:
+          - string
+          - 'null'
+          example: production
+        enabled:
+          type: boolean
+        intercept_enabled:
+          type: boolean
+          description: Whether this route participates in transparent interception — the agent's intercept mode AND the SDKs' `wrap.intercept()` route calls to its target host through it. Per environment; this view is the base environment's value. See GET /wrap/intercept-manifest.
+          example: false
+        requires_clients:
+          type: boolean
+        mtls_certificate_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        collection_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        environment_override_count:
+          type: integer
+          description: Number of environment-specific configuration overrides.
+          example: 2
+        configured_environments:
+          type: array
+          items:
+            type: string
+          description: Names of environments that have overrides configured.
+          example:
+          - staging
+          - development
+        payload_structure:
+          type: object
+          additionalProperties: true
+          description: 'The base environment''s saved sample request body, as its
+
+            **structure only** — the same keys and nesting, with every value
+
+            replaced by a type placeholder: `"<string>"`, `"<number>"` or
+
+            `"<boolean>"` (`null` stays `null`; arrays keep each element,
+
+            projected the same way). Present only when a base-environment
+
+            config exists.
+
+
+            The sample''s values are never returned by the API, whatever the
+
+            key''s scopes and whatever the query string: a saved sample is
+
+            usually a captured request, so its values are a recorded,
+
+            step-up-gated reveal for an Admin or the Owner in the dashboard.
+
+            '
+          example:
+            order:
+              id: <string>
+              amount: <number>
+              paid: <boolean>
+              note: null
+              items:
+              - sku: <string>
+        injection_rules:
+          type: array
+          items:
+            type: object
+          deprecated: true
+          description: '**Deprecated and never applied.** Present only when a base-environment
+
+            config exists, and echoed here only so a legacy value written through
+
+            the dashboard remains visible. It is applied to no request, and
+
+            `POST /routes` and `PATCH /routes/{id}` now reject a non-empty value.
+
+            Body secret injection works by placing `{{secret_id:<uuid>}}` or
+
+            `{{secret:<name>}}` placeholders in the request body your client
+
+            sends, for a secret the route''s own templates already send; any
+
+            other secret is refused with 403 `client_placeholder_not_bound`
+
+            (accounts created before that rule was deployed are report-only
+
+            until switched over: the placeholder resolves and each use is
+
+            audited). Do not send this field back in an update.
+
+            '
+        ip_allowlist:
+          type: array
+          items:
+            type: string
+          description: Present only when a base-environment config exists.
+        data_plane_node_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Present only when a base-environment config exists.
+    RouteEnvironmentConfig:
+      type: object
+      description: Environment-specific configuration override for a route.
+      properties:
+        environment_name:
+          type: string
+          description: The environment this override applies to.
+          example: staging
+        target_base_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: Override upstream URL for this environment.
+          example: https://api-staging.stripe.com
+        inject_headers_json:
+          type:
+          - object
+          - 'null'
+          additionalProperties:
+            type: string
+          description: Override injected headers for this environment.
+        inject_body_json:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+          description: Override injected body fields for this environment.
+        require_signature:
+          type:
+          - boolean
+          - 'null'
+        signature_tolerance_sec:
+          type:
+          - integer
+          - 'null'
+        rate_limit_enabled:
+          type:
+          - boolean
+          - 'null'
+        rate_limit_requests:
+          type:
+          - integer
+          - 'null'
+        rate_limit_window_sec:
+          type:
+          - integer
+          - 'null'
+        rate_limit_burst:
+          type:
+          - integer
+          - 'null'
+        allowed_methods:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+        intercept_enabled:
+          type: boolean
+          description: Whether this route participates in transparent interception — the agent's intercept mode AND the SDKs' `wrap.intercept()` route calls to its target host through it. Per environment; this view is the base environment's value. See GET /wrap/intercept-manifest.
+          example: false
+        requires_clients:
+          type: boolean
+          description: Whether requests in this environment must come from an authorized client.
+        mtls_certificate_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Certificate-type secret used for upstream mTLS in this environment.
+        egress_server_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Egress server (static IP) for this environment. Null means direct.
+        enabled:
+          type: boolean
+          description: 'Per-environment serving switch. False pauses this environment
+
+            only; the route-level `enabled` flag disables every environment.
+
+            '
+        payload_structure:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+          description: 'This environment''s saved sample request body, as its **structure
+
+            only**: the same keys and nesting, each value replaced by a type
+
+            placeholder (`"<string>"`, `"<number>"`, `"<boolean>"`; `null`
+
+            stays `null`). The values are never returned by the API.
+
+            '
+        method_configs:
+          type:
+          - array
+          - 'null'
+          items:
+            type: object
+            additionalProperties: true
+          description: 'Per-HTTP-method overrides for this environment. A `payload_structure`
+
+            inside an entry is returned as its structure only, exactly like the
+
+            environment''s own `payload_structure`; every other field of the
+
+            entry is returned as stored.
+
+            '
+    Route:
+      type: object
+      description: 'Full route row as returned after create or update operations. Runtime
+
+        injection/rate-limit configuration lives in the per-environment
+
+        configs (see `GET /routes/{id}/environments`), not on this row.
+
+        '
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: d290f1ee-6c54-4b01-90e6-d701748f0851
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: stripe-payments
+        slug:
+          type:
+          - string
+          - 'null'
+          description: Write-once machine handle for code references. Null when unset.
+          example: default-stripe-payments
+        sandbox:
+          type: boolean
+          description: Whether this route lives in Test (sandbox) mode.
+        target_base_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: 'Derived read-only view of the base environment''s target URL. Set
+
+            it per environment via the environment-config endpoints; the
+
+            value accepted on create seeds the base environment''s config.
+
+            '
+          example: https://api.stripe.com
+        enabled:
+          type: boolean
+          example: true
+        intercept_enabled:
+          type: boolean
+          description: Whether this route participates in transparent interception — the agent's intercept mode AND the SDKs' `wrap.intercept()` route calls to its target host through it. Per environment; this view is the base environment's value. See GET /wrap/intercept-manifest.
+          example: false
+        requires_clients:
+          type: boolean
+          description: 'Derived read-only view of the base environment''s setting. Client
+
+            authorization is per-environment; set it via PATCH (fans out to
+
+            every environment) or the environment-config endpoints.
+
+            '
+          example: false
+        base_environment:
+          type:
+          - string
+          - 'null'
+          example: production
+        mtls_certificate_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'Derived read-only view of the base environment''s mTLS binding
+
+            (certificate-type secret used for upstream mTLS). Per-environment
+
+            since migration 20260723.
+
+            '
+        egress_server_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Derived read-only view of the base environment's egress server.
+        collection_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        favicon_url:
+          type:
+          - string
+          - 'null'
+        favicon_updated_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        favicon_data:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+    RequestLog:
+      type: object
+      description: 'A record of a proxied API request.
+
+
+        On `GET /logs` the fields `id`, `request_id`, `tenant_id`, `route_id`,
+
+        `matched_client_id`, `identification_method`, `method`, `status_code`,
+
+        `src_ip`, `environment`, `sandbox` and `ts` are exactly what the Merkle
+
+        anchor commits to, in that order - see `GET /logs/{request_id}/proof`.
+
+        Every other field is operational detail and is NOT part of the leaf.
+
+        '
+      properties:
+        id:
+          type: string
+          description: Row id as a decimal string. This is `api_requests.id`, a bigint - NOT a uuid, which earlier revisions of this schema incorrectly declared. It is a string rather than a JSON number because a JSON number is a double and cannot hold a bigint exactly past 2^53.
+        request_id:
+          type: string
+          format: uuid
+          description: Correlation ID for the proxied request.
+        ts:
+          type: string
+          format: date-time
+          description: Timestamp of the request.
+          example: '2025-03-15T10:30:00.000Z'
+        src_ip:
+          type: string
+          description: 'Source IP address of the caller, host form without a prefix length. Identity tier on `GET /logs`: requires `log:read_identity`, and is ABSENT (not null) when denied.'
+          example: 203.0.113.42
+        method:
+          type: string
+          description: HTTP method used.
+          example: POST
+        path:
+          type: string
+          description: Request path.
+          example: /v1/charges
+        status_code:
+          type: integer
+          description: HTTP status code returned by the upstream.
+          example: 200
+        latency_ms:
+          type: integer
+          description: Round-trip latency in milliseconds.
+          example: 145
+        upstream_host:
+          type:
+          - string
+          - 'null'
+          description: Upstream host the request was forwarded to.
+          example: api.stripe.com
+        error:
+          type:
+          - string
+          - 'null'
+          description: Error message if the request failed.
+        environment:
+          type:
+          - string
+          - 'null'
+          description: Environment the request was resolved against.
+          example: production
+        rate_limited:
+          type:
+          - boolean
+          - 'null'
+          description: Whether this request was rate-limited.
+        signature_valid:
+          type:
+          - boolean
+          - 'null'
+          description: Whether the request signature was valid (if required).
+        source_ip_country:
+          type:
+          - string
+          - 'null'
+          description: Country of the source IP (GeoIP lookup).
+          example: US
+        source_ip_city:
+          type:
+          - string
+          - 'null'
+          description: City of the source IP (GeoIP lookup).
+          example: San Francisco
+        tenant_id:
+          type: string
+          format: uuid
+          description: Owning tenant. Returned by `GET /logs`; omitted by `GET /routes/{id}/logs`.
+        route_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        matched_client_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'Which client the request was attributed to. Kept when that client is later deleted, so it may name a client that no longer exists: it is a committed field of the row''s Merkle leaf and is never rewritten. Identity tier on `GET /logs`: requires `log:read_identity`, and is ABSENT (not null) when denied.'
+        identification_method:
+          type:
+          - string
+          - 'null'
+          description: How that attribution was made (e.g. `ip`, `mtls_thumbprint`). Identity tier on `GET /logs`.
+        sandbox:
+          type:
+          - boolean
+          - 'null'
+          description: Live/Test partition. `null` on rows written before the partition existed, which are treated as Live. Null, false and true are three distinct facts and the Merkle anchor keeps them apart.
+        proxy_mode:
+          type:
+          - string
+          - 'null'
+        cursor:
+          type: string
+          description: Opaque resume token, returned by `GET /logs` only. Pass the last row's value as `cursor` on the next call.
+        client_origin:
+          type: string
+          enum:
+          - direct
+          - sdk_intercept
+          description: 'How the call arrived at the Route. `sdk_intercept`: a KnoxCall SDK''s route-aware interceptor rerouted a third-party SDK''s request onto the Route (the SDK sent `x-knoxcall-origin: sdk-intercept`). `direct`: a plain `call()` / bound-route request, and every row written before the marker existed. Informational only - it never influences authentication, routing, rate limits or the response block.'
+    DeletedResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            deleted:
+              type: boolean
+              example: true
+          required:
+          - deleted
+        meta:
+          $ref: '#/components/schemas/RequestMeta'
+      required:
+      - data
+      - meta
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
+    PaginationMeta:
+      type: object
+      description: Pagination metadata for list endpoints.
+      properties:
+        total:
+          type: integer
+          description: Total number of records matching the query.
+          example: 42
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        per_page:
+          type: integer
+          description: Number of records per page.
+          example: 20
+        total_pages:
+          type: integer
+          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
+          example: 3
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - total
+      - page
+      - per_page
+      - total_pages
+      - request_id
+    RouteEnvironmentConfigInput:
+      type: object
+      description: 'Fields for creating or updating an environment override. All fields are optional;
+
+        only provided fields are set. Existing fields not included in the request are preserved.
+
+        '
+      properties:
+        intercept_enabled:
+          type: boolean
+          description: Opt this route into transparent interception (agent intercept mode and the SDKs' `wrap.intercept()`). Per environment. Must be a boolean; anything else answers `400`.
+        target_base_url:
+          type: string
+          format: uri
+          example: https://api-staging.stripe.com
+        inject_headers_json:
+          type: object
+          additionalProperties:
+            type: string
+        inject_body_json:
+          type: object
+          additionalProperties: true
+        require_signature:
+          type: boolean
+        signature_tolerance_sec:
+          type: integer
+        rate_limit_enabled:
+          type: boolean
+        rate_limit_requests:
+          type: integer
+        rate_limit_window_sec:
+          type: integer
+        rate_limit_burst:
+          type: integer
+        allowed_methods:
+          type: array
+          items:
+            type: string
+    RequestMeta:
+      type: object
+      description: Metadata included with every API response.
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    UpdateRouteRequest:
+      type: object
+      description: All fields are optional. Only provided fields will be updated.
+      properties:
+        name:
+          type: string
+          example: stripe-payments-v2
+        slug:
+          type: string
+          description: 'Write-once: settable only while the route has no slug; immutable
+
+            forever after (requests to change an existing slug return 400).
+
+            '
+        egress_server_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Route traffic through this egress server. Must be owned by or allocated to your account.
+        data_plane_node_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Pin the route to a data-plane node you own (or a shared managed node).
+        target_base_url:
+          type: string
+          format: uri
+          example: https://api.stripe.com/v2
+        enabled:
+          type: boolean
+          example: true
+        intercept_enabled:
+          type: boolean
+          description: Opt this route into transparent interception (agent intercept mode and the SDKs' `wrap.intercept()`). Per environment. Must be a boolean; anything else answers `400`.
+        requires_clients:
+          type: boolean
+        require_signature:
+          type: boolean
+        signature_tolerance_sec:
+          type: integer
+          minimum: 1
+          example: 300
+        rate_limit_enabled:
+          type: boolean
+        rate_limit_requests:
+          type: integer
+          minimum: 1
+          example: 100
+        rate_limit_window_sec:
+          type: integer
+          minimum: 1
+          example: 60
+        rate_limit_burst:
+          type: integer
+          minimum: 0
+        allowed_methods:
+          type: array
+          items:
+            type: string
+            enum:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - HEAD
+            - OPTIONS
+          example:
+          - GET
+          - POST
+        http_method_restrictions_enabled:
+          type: boolean
+        ip_allowlist:
+          type: array
+          items:
+            type: string
+        inject_headers_json:
+          type: object
+          additionalProperties:
+            type: string
+        inject_body_json:
+          type: object
+          additionalProperties: true
+        injection_rules:
+          type: array
+          items:
+            type: object
+          deprecated: true
+          description: '**Removed — a non-empty value is rejected with 400.** It was stored
+
+            and applied to nothing. Use `{{secret_id:<uuid>}}` /
+
+            `{{secret:<name>}}` placeholders in the request body your client
+
+            sends, for a secret the route''s own templates already send (any
+
+            other is refused with 403 `client_placeholder_not_bound`, except
+
+            on accounts created before that rule was deployed, which are
+
+            report-only until switched over). An empty array is still
+
+            accepted as a no-op.
+
+            '
+        method_configs:
+          type: object
+          additionalProperties:
+            type: object
+          description: 'Per-HTTP-method overrides for the route''s base environment. A saved
+
+            sample is read back as its structure only (see
+
+            `RouteEnvironmentConfig.method_configs`), so an entry whose
+
+            `payload_structure` equals that structure keeps the stored sample
+
+            rather than replacing it with its placeholders; any other
+
+            `payload_structure` is saved as sent.
+
+            '
+    CreateRouteRequest:
+      type: object
+      required:
+      - name
+      - target_base_url
+      properties:
+        name:
+          type: string
+          description: Unique name for the route. This becomes the URL path segment used to proxy requests.
+          example: stripe-payments
+        slug:
+          type:
+          - string
+          - 'null'
+          description: 'Write-once machine handle for code references. Omit to derive a
+
+            `{collection}-{name}` default; pass null for no slug. Lowercase
+
+            letters, numbers, and hyphens; cannot look like a UUID; immutable
+
+            once set.
+
+            '
+          example: default-stripe-payments
+        target_base_url:
+          type: string
+          format: uri
+          description: 'The upstream URL that requests will be forwarded to. Resolved and SSRF-checked at write time: a private, loopback or link-local address, or any KnoxCall-owned host (`*.knoxcall.com`), is refused with `400 ssrf_blocked` — routes never target the platform that serves them.'
+          example: https://api.stripe.com
+        base_environment:
+          type: string
+          description: Default environment for the route. Must be an existing environment name.
+          default: production
+          example: production
+        inject_headers_json:
+          type: object
+          additionalProperties:
+            type: string
+          description: Headers to inject. Use `{{SECRET_NAME}}` to reference secrets.
+          example:
+            Authorization: Bearer {{STRIPE_SECRET_KEY}}
+        inject_body_json:
+          type: object
+          additionalProperties: true
+          description: Body fields to inject. Use `{{SECRET_NAME}}` to reference secrets.
+        injection_rules:
+          type: array
+          items:
+            type: object
+          deprecated: true
+          description: '**Removed — a non-empty value is rejected with 400.** It was stored
+
+            and applied to nothing. Use `{{secret_id:<uuid>}}` /
+
+            `{{secret:<name>}}` placeholders in the request body your client
+
+            sends, for a secret the route''s own templates already send (any
+
+            other is refused with 403 `client_placeholder_not_bound`, except
+
+            on accounts created before that rule was deployed, which are
+
+            report-only until switched over). An empty array is still
+
+            accepted as a no-op.
+
+            '
+        ip_allowlist:
+          type: array
+          items:
+            type: string
+          description: IP addresses or CIDR ranges allowed to call this route.
+          example:
+          - 203.0.113.0/24
+        method_configs:
+          type: object
+          additionalProperties:
+            type: object
+          description: Per-HTTP-method configuration overrides.
+        collection_id:
+          type: string
+          format: uuid
+          description: Assign this route to a collection.
+    RouteSummary:
+      type: object
+      description: Summary representation of a route returned in list responses.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: d290f1ee-6c54-4b01-90e6-d701748f0851
+        name:
+          type: string
+          description: Unique human-readable route name, used as the URL path segment.
+          example: stripe-payments
+        slug:
+          type:
+          - string
+          - 'null'
+          description: Write-once machine handle for code references (like a Stripe lookup_key). Null when unset.
+          example: default-stripe-payments
+        target_base_url:
+          type: string
+          format: uri
+          description: The upstream URL that requests are forwarded to.
+          example: https://api.stripe.com
+        base_environment:
+          type: string
+          description: Default environment for this route.
+          example: production
+        enabled:
+          type: boolean
+          description: Whether the route is active and accepting requests.
+          example: true
+        require_signature:
+          type: boolean
+          description: Whether request signature verification is required.
+          example: false
+        rate_limit_enabled:
+          type: boolean
+          description: Whether per-route rate limiting is active.
+          example: true
+        rate_limit_requests:
+          type:
+          - integer
+          - 'null'
+          description: Maximum number of requests allowed per rate limit window.
+          example: 100
+        rate_limit_window_sec:
+          type:
+          - integer
+          - 'null'
+          description: Rate limit window duration in seconds.
+          example: 60
+        allowed_methods:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          description: List of allowed HTTP methods. Null means all methods are allowed.
+          example:
+          - GET
+          - POST
+        intercept_enabled:
+          type: boolean
+          description: Whether this route participates in transparent interception — the agent's intercept mode AND the SDKs' `wrap.intercept()` route calls to its target host through it. Per environment; this view is the base environment's value. See GET /wrap/intercept-manifest.
+          example: false
+        requires_clients:
+          type: boolean
+          description: Whether requests must come from an authorized client.
+          example: false
+        collection_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Collection this route belongs to, if any.
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+        environment_override_count:
+          type: integer
+          description: Number of environment-specific configuration overrides.
+          example: 2
+  parameters:
+    ApiVersionParam:
+      name: KnoxCall-Version
+      in: header
+      required: false
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+        example: '2026-08-05'
+      description: Pin to a dated API version (`YYYY-MM-DD`); omitted → newest. Unknown version → `400 invalid_api_version`. Applies to every operation; the resolved version is echoed in the `KnoxCall-Version` response header.
+    OrderParam:
+      name: order
+      in: query
+      schema:
+        type: string
+        enum:
+        - asc
+        - desc
+        default: desc
+      description: Sort direction.
+    PerPageParam:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page (max 100).
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
+    EnabledParam:
+      name: enabled
+      in: query
+      required: false
+      schema:
+        type: boolean
+      description: Filter the result set to only enabled (`true`) or only disabled (`false`) resources.
+    SortParam:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+      description: 'Field to sort the result set by. The set of accepted fields varies per endpoint;
+
+        pair with `order` (`asc`/`desc`) to control direction.
+
+        '
+      example: created_at
+    RouteId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The route UUID.
+      example: d290f1ee-6c54-4b01-90e6-d701748f0851
+    IdempotencyKeyParam:
+      name: X-Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+      description: 'Optional idempotency key so a retried mutating request is executed at most once.
+
+        The standard `Idempotency-Key` spelling is also accepted. Replaying a completed
+
+        request with the same key returns the original stored response with an
+
+        `X-Idempotent-Replay: true` header. A key still in progress returns
+
+        `409 request_in_progress`; the same key with a different body returns
+
+        `422 idempotency_key_reuse`; a malformed key returns `400 invalid_idempotency_key`.
+
+        '
+      example: 3f6c9b2e-1a4d-4c8e-9b0a-7d2e5f1c3a8b
+  headers:
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+    X-Idempotent-Replay:
+      description: 'Set to `true` when this response is a replayed copy of a previously completed
+
+        request that carried the same idempotency key.
+
+        '
+      schema:
+        type: boolean
+      example: true
+    X-RateLimit-Reset:
+      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
+
+        response whenever a rate limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1735689600
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+    X-RateLimit-Remaining:
+      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 999
+    Retry-After:
+      description: Seconds to wait before retrying. Set on `429` responses.
+      schema:
+        type: integer
+      example: 30
+    X-RateLimit-Limit:
+      description: 'Maximum requests allowed per window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1000
+  responses:
+    PlanLimit:
+      description: 'Payment Required. The action exceeds your plan''s limits. Two `error.type` values
+
+        share this status: `plan_limit` when a COUNTED resource quota was reached (routes,
+
+        secrets, AI agents, MCP servers), and `plan_feature` when the CAPABILITY itself is
+
+        not on your tier (custom PII redaction policies, compliance packs, custom
+
+        prompt-firewall policies). Both mean "upgrade to proceed"; branch on `type` only if
+
+        you want to distinguish "you have used your allowance" from "buy a bigger plan".
+
+
+        Neither ever revokes something you already have: a plan downgrade leaves existing
+
+        agents, policies and installed packs in place and keeps working.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: plan_limit
+              message: Route limit reached (10). Upgrade your plan to add more.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    RateLimited:
+      description: 'Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
+
+        also present on non-429 responses whenever a limit is configured.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: rate_limit_exceeded
+              message: API rate limit exceeded. Please retry later.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    Forbidden:
+      description: 'The key is authenticated but not authorized for this action (missing scope), a plan
+
+        limit was reached, or the resource must be managed via OAuth (`use_oauth`) / is a
+
+        protected system client (`system_client_protected`).
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              summary: Missing scope
+              value:
+                error:
+                  type: forbidden
+                  message: This key is not authorized to list AI gateways.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            use_oauth:
+              summary: Resource is OAuth-only
+              value:
+                error:
+                  type: use_oauth
+                  message: This resource must be managed with an OAuth 2.1 access token.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            system_client_protected:
+              summary: Protected system client
+              value:
+                error:
+                  type: system_client_protected
+                  message: This client is managed by the platform and cannot be modified.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    RouteDestinationLocked:
+      description: 'The write would give a route that carries a standing `decrypt` or `detokenize` field
+
+        action a destination it does not already store (or switch on one it stores but does not
+
+        send to), and this credential may not open those
+
+        values. `forbidden` — a token issued to a person (refused whatever the role: make the
+
+        change from the dashboard as an Owner or Admin), or a key whose policy lacks the action''s
+
+        own permission (`transit:decrypt` / `vaults:detokenize`). `insufficient_scope` — an OAuth
+
+        token narrowed to scopes that do not include the action''s own scope; the
+
+        `WWW-Authenticate` header names it. Nothing was written. Not retryable as is.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            person_token:
+              summary: A token issued to a person
+              value:
+                error:
+                  type: forbidden
+                  message: 'A token issued to a person (knoxcall login, a device or authorization-code grant) cannot change where this route sends: it carries a decrypt or detokenize action, so its destination receives the opened values. Change it from the dashboard as an Owner or Admin (it asks for a fresh second factor), or use a machine credential that holds the action''s own permission (transit:decrypt or vaults:detokenize).'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            insufficient_scope:
+              summary: A narrowed token without the action's scope
+              value:
+                error:
+                  type: insufficient_scope
+                  message: This access token was granted [routes:write] and does not include transit:decrypt. This route carries a standing `decrypt` action, so changing where it sends needs that scope.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    RequestInProgress:
+      description: 'A request with the same idempotency key is still being processed. Retry after a
+
+        short delay; do not change the request body.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: request_in_progress
+              message: A request with this idempotency key is already in progress.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    InternalError:
+      description: An unexpected server error occurred.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: internal_error
+              message: An unexpected error occurred.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    IdempotencyKeyReuse:
+      description: 'The supplied idempotency key was already used for a request with a different body.
+
+        Idempotency keys may only be reused with an identical request.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: idempotency_key_reuse
+              message: This idempotency key was already used with a different request body.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    InterceptRouteConflict:
+      description: '`intercept_route_conflict` — the request would turn `intercept_enabled` on for a route
+
+        whose upstream host and base path another intercept-enabled route already covers in the
+
+        same environment. Only one route may take a host''s traffic under route-aware
+
+        interception: turn the flag off on the route the message names, or leave it off here.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: intercept_route_conflict
+              message: Route "hubspot-crm" already intercepts api.hubapi.com/crm/v3 in production. Turn Intercept off on that route first, or leave it off on this one.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    Unauthorized:
+      description: Authentication is required or the provided API key is invalid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_key:
+              summary: No API key provided
+              value:
+                error:
+                  type: authentication_required
+                  message: 'API key is required. Use Authorization: Bearer <api_key> or x-api-key header.'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_key:
+              summary: Invalid API key
+              value:
+                error:
+                  type: invalid_api_key
+                  message: Invalid API key.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: 'OAuth 2.1 authentication — recommended for new integrations. Access tokens
+
+        (`kc_` prefix) are minted at the root-host token endpoint
+
+        `https://api.knoxcall.com/oauth/token` and passed as `Authorization: Bearer <access_token>`.
+
+        Public clients must use PKCE with the `authorization_code` grant; confidential
+
+        clients may use `client_credentials`. The first-party SDKs and the
+
+        `knoxcall login` CLI handle token minting, caching, refresh, and DPoP for you.
+
+        '
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+        authorizationCode:
+          authorizationUrl: https://api.knoxcall.com/oauth/authorize
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+    PhantomToken:
+      type: http
+      scheme: bearer
+      description: "The AI **data plane** credential — a `kp_`-prefixed capability token, not a\nManagement API credential. It is minted per agent (or per MCP resource) at\n`POST /v1/ai-gateway/agents/{agentId}/tokens`, or exchanged from a CI workload's\nOIDC token at `POST /v1/oauth/token`, and it is the ONLY credential `/v1/ai/*`\naccepts: an OAuth `kc_` access token or a `tk_` API key is refused there, and a\n`kp_` token is refused on `api.knoxcall.com`.\n\nThree header spellings are accepted, so an existing provider SDK can be pointed at\nthe agent URL without rewriting its auth:\n\n    Authorization: Bearer kp_live_a_...\n    x-api-key: kp_live_a_...\n    x-knox-ai-key: kp_live_a_...\n\n`kp_live_` is refused on the sandbox host and `kp_test_` on the Live host — the env\nsegment is enforced, not cosmetic. DPoP-bound tokens additionally require a valid\n`DPoP` proof header on every request, signed over the canonical public URL rather\nthan a rewritten `Host`.\n\nA rejected credential answers `401`/`403` in the data-plane error envelope with the\ncause in `code` and in the `X-Auth-Failure` response header.\n"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Legacy long-lived API key authentication via the Authorization header.
+
+        Pass your API key as: `Authorization: Bearer tk_xxx_yyy`.
+
+
+        Standard keys (`tk_` prefix) are accepted on `api.knoxcall.com`.
+
+        Test keys (type=test) are accepted on `sandbox.knoxcall.com`.
+
+        Enterprise Access Keys (`AKE` prefix) are accepted on both.
+
+
+        Fully supported, but prefer the `OAuth2` scheme (or the SDKs, which handle
+
+        OAuth for you) for new integrations.
+
+        '
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: 'Legacy API key authentication via the `x-api-key` header.
+
+        This is an alternative to Bearer token authentication for clients that cannot
+
+        set the `Authorization` header. Prefer the `OAuth2` scheme for new integrations.
+
+        '
+    CapabilityTokenAuth:
+      type: http
+      scheme: bearer
+      description: 'Single-use client capability token (`kct_` prefix), passed as
+
+        `Authorization: Bearer kct_...`. Minted server-side via
+
+        `POST /client-tokens` and bound either to one exact payload + action
+
+        (`decrypt`, `detokenize`) or to one vault + a closed set of page
+
+        origins (`tokenize`). This is NOT an API key — it authenticates only
+
+        the `POST /client/decrypt`, `POST /client/detokenize` and
+
+        `POST /client/tokenize` consume endpoints and is invalidated after its
+
+        first use.
+
+        '

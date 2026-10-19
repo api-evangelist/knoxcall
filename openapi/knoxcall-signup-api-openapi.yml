@@ -1,0 +1,680 @@
+openapi: 3.2.0
+info:
+  title: KnoxCall Client Management Signup API
+  version: '1.0'
+  description: 'The KnoxCall Client Management API provides programmatic access to manage your API gateway
+
+    resources including routes, secrets, clients, environments, webhooks, and API keys. ## Authentication
+
+
+    All requests must include an OAuth 2.1 access token **or** a legacy API key. The
+
+    recommended path for new integrations is the first-party SDKs, which mint, cache, and
+
+    refresh OAuth tokens for you (start with `knoxcall login` on a developer machine, or
+
+    `KNOXCALL_CLIENT_ID` / `KNOXCALL_CLIENT_SECRET` in CI). You can authenticate using any of:
+
+
+    - **Authorization header (OAuth 2.1 bearer token — recommended)**: `Authorization: Bearer `
+
+    - **Authorization header (legacy API key)**: `Authorization: Bearer tk_xxx_yyy`
+
+    - **x-api-key header (legacy API key)**: `x-api-key: tk_xxx_yyy`
+
+
+    OAuth 2.1 access tokens (`kc_` prefix) are minted at the root-host token endpoint
+
+    `https://api.knoxcall.com/oauth/token` (not under `/v1`) using the `client_credentials`
+
+    or `authorization_code` grant. See the `OAuth2` security scheme and the `/oauth/*`
+
+    endpoints. Some resources that are managed exclusively through OAuth reject API-key auth
+
+    with a `403 use_oauth` error. Long-lived API keys remain fully supported. They come in three types:
+
+    - **Standard keys** (`tk_` prefix) are used on the production API (`api.knoxcall.com`). - **Test keys** (`tk_` prefix, type=test) are used on the sandbox API (`sandbox.knoxcall.com`). - **Enterprise Access Keys** (`AKE` prefix) follow the format `AKE[16chars]:[40chars]`. Using a test key on the production API (or vice versa) will return a `403 wrong_key_type` error. ## Request IDs
+
+
+    Every response — success or error — includes an `X-Request-Id` response header (a UUID). Its value is identical to the `request_id` field in the response body (`meta.request_id`
+
+    on success, `error.request_id` on error). Quote it when contacting support. ## API Versioning
+
+
+    The API is versioned on two axes:
+
+
+    - **Major version — the `/v1` path prefix.** Breaking changes ship under a new major
+
+    (`/v2`). `/v1` never receives a breaking change. - **Minor version — the `KnoxCall-Version` header (dated, `YYYY-MM-DD`).** Send
+
+    `KnoxCall-Version: 2026-08-05` to pin the behaviour of a specific dated release. Omit
+
+    the header to get the newest minor version. Every response echoes the resolved version
+
+    back in a `KnoxCall-Version` response header. Within a major version, **additive changes are not breaking** and may appear without a new
+
+    dated version: new endpoints, new optional request fields, new response fields, new
+
+    `error.type` values, and new enum members. Clients must tolerate unknown response fields
+
+    and unknown `error.type` values (see the `ErrorResponse` schema). An **unknown or malformed** `KnoxCall-Version` value returns `400` with
+
+    `error.type: invalid_api_version`. ## Rate Limiting
+
+
+    API keys can have optional rate limits configured. When a limit is configured, the
+
+    following headers are emitted on **every** response (not only `429`s):
+
+    - `X-RateLimit-Limit` -- maximum requests allowed per window
+
+    - `X-RateLimit-Remaining` -- remaining requests in the current window
+
+    - `X-RateLimit-Reset` -- epoch seconds at which the window resets
+
+
+    When the limit is exceeded the API returns `429` (`rate_limit_exceeded` / `rate_limited`)
+
+    and additionally sets `Retry-After` (seconds until the window resets). ## DPoP sender-constrained tokens, and the server nonce
+
+
+    A token minted with a `cnf.jkt` binding (DPoP, RFC 9449) requires a `DPoP` proof header
+
+    on every request, signed over the request''s method and canonical public URL. **Every response to a request that carried a `DPoP` header also carries a
+
+    `DPoP-Nonce` response header** -- mints, refusals and successful calls alike, on
+
+    `POST /oauth/token`, `/v1`, the tenant data plane, the self-hosted proxy and the AI
+
+    gateway. The value is stateless and changes every minute; the server accepts the current
+
+    and the previous minute''s, so a nonce is good for 60-120 seconds.'
+  contact:
+    name: KnoxCall Support
+    url: https://knoxcall.com
+    email: support@knoxcall.com
+  license:
+    name: Proprietary
+    url: https://knoxcall.com/terms
+servers:
+- url: https://api.knoxcall.com/v1
+  description: Production
+- url: https://sandbox.knoxcall.com/v1
+  description: Sandbox (test keys only)
+security:
+- OAuth2: []
+- BearerAuth: []
+- ApiKeyAuth: []
+tags:
+- name: Signup
+  description: Headless account creation — the only unauthenticated endpoint, designed so scripts and AI agents can onboard without a browser.
+paths:
+  /signup:
+    post:
+      operationId: createAccount
+      summary: Start account creation (headless signup)
+      description: 'Start creating a KnoxCall account and tenant - no browser required.
+
+
+        This call **never returns a credential**. It always answers `202` with an opaque
+
+        `claim_handle` and emails a sign-in link to the address. The tenant is created when that
+
+        link is clicked; the caller then polls `POST /v1/signup/claim` with the handle to collect
+
+        a one-time **test API key** and the seeded Test-mode demo route, so the whole integration
+
+        can still be built headlessly against `sandbox.knoxcall.com`.
+
+
+        Only available on `api.knoxcall.com` (not the sandbox host). Rate limited to 3 signups
+
+        per hour per IP.
+
+
+        **Account existence is NOT observable on this endpoint.** Every response - accepted or
+
+        rejected - is independent of whether the address already has an account: same status,
+
+        same body shape, a handle drawn from the same generator with the same lifetime, and no
+
+        credential anywhere. An address that already has an account receives a sign-in link and a
+
+        handle that stays `pending` forever. (Before 2026-08-28 this endpoint answered `201` plus
+
+        an instant API key for a new address and `202` for a registered one, which was a complete
+
+        account-existence oracle; that contract is withdrawn.)'
+      tags:
+      - Signup
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              - tenant_name
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Account owner's email. Receives the sign-in link that creates the tenant.
+                tenant_name:
+                  type: string
+                  maxLength: 100
+                  description: Company or team name.
+                full_name:
+                  type: string
+                  description: Owner's full name. Defaults to the tenant name.
+                tenant_slug:
+                  type: string
+                  pattern: ^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$
+                  minLength: 3
+                  maxLength: 40
+                  description: 'Desired subdomain ({slug}.knoxcall.com): 3-40 chars of lowercase letters, digits and hyphens, starting and ending with a letter or digit. Reserved subdomains (www, api, admin, well-known brand names, ...) and the sandbox- prefix are rejected. Omit to have one derived from tenant_name automatically (recommended for headless callers - the server converges on an available slug on its own).'
+                country:
+                  type: string
+                  minLength: 2
+                  maxLength: 2
+                  pattern: ^[A-Za-z]{2}$
+                  description: 'ISO 3166-1 alpha-2 country code. Used to derive the data region when region is omitted. Enforced: anything else (an alpha-3 code such as USA, or a country name) is a 400 invalid_request, not a deferred failure - the column is two characters wide.'
+                region:
+                  type: string
+                  enum:
+                  - us
+                  - eu
+                  - au
+                  description: Explicit data region. Immutable after signup.
+            example:
+              email: dev@example.com
+              tenant_name: Acme Inc
+      responses:
+        '202':
+          description: 'Accepted - the ONLY success status, returned identically whether or not the address
+
+            already has an account. Poll `claim_path` with `claim_handle` once the emailed
+
+            sign-in link has been clicked.
+
+            '
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                      claim_handle:
+                        type: string
+                        description: 'Opaque single-use handle (`sck_` plus 43 url-safe characters). Present on every accepted signup. Treat it as a secret: it is what collects the starter credential.'
+                      claim_path:
+                        type: string
+                        description: Path to poll, on the same API host.
+                        example: /v1/signup/claim
+                      poll_after_seconds:
+                        type: integer
+                        description: Suggested delay between polls.
+                      expires_at:
+                        type: string
+                        format: date-time
+                        description: After this, the handle is rejected exactly like an unknown one.
+                      message:
+                        type: string
+                      documentation:
+                        type: string
+                  meta:
+                    type: object
+                    properties:
+                      request_id:
+                        type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /signup/claim:
+    post:
+      operationId: claimSignup
+      summary: Collect starter credentials for a signup claim
+      description: 'Poll a `claim_handle` returned by `POST /v1/signup`.
+
+
+        Answers `202` (`status: pending`) until the emailed sign-in link has been clicked, then
+
+        `200` once with the tenant, the seeded Test-mode demo route and a one-time test API key.
+
+        The credential is minted at collection time and shown exactly once - a second poll gets
+
+        `409`.
+
+
+        Unauthenticated by design: the claim handle is the bearer. It is unguessable (256 bits),
+
+        single-use, and expires. An unknown handle and an expired one get the same `404`, and a
+
+        handle whose link has not been clicked polls `pending` regardless of whether the address
+
+        already had an account.'
+      tags:
+      - Signup
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - claim_handle
+              properties:
+                claim_handle:
+                  type: string
+                  description: The handle returned by POST /v1/signup.
+            example:
+              claim_handle: sck_Yy3n0Rz1qF8mKpX2sVb7dH9tLwQ4eJ6uA1cN5gZ8kT0
+      responses:
+        '200':
+          description: Ready. The starter api_key value is returned exactly once - store it before anything else.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                        - ready
+                      tenant:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          slug:
+                            type: string
+                          name:
+                            type: string
+                          region:
+                            type: string
+                          plan:
+                            type: string
+                      starter:
+                        type: object
+                        description: Seeded Test-mode demo route + one-time test API key.
+                        properties:
+                          route:
+                            type:
+                            - object
+                            - 'null'
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              name:
+                                type: string
+                              target_base_url:
+                                type: string
+                          api_key:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              key_id:
+                                type: string
+                              api_key:
+                                type: string
+                                description: Plaintext test key - shown only in this response.
+                              key_prefix:
+                                type: string
+                              key_type:
+                                type: string
+                                enum:
+                                - test
+                          sandbox_host:
+                            type: string
+                          curl:
+                            type: string
+                            description: Ready-to-run curl that exercises the demo route.
+                      sandbox:
+                        type: object
+                        properties:
+                          management_api:
+                            type: string
+                          proxy_host:
+                            type: string
+                          note:
+                            type: string
+                      documentation:
+                        type: string
+                  meta:
+                    type: object
+                    properties:
+                      request_id:
+                        type: string
+        '202':
+          description: 'Not ready - the sign-in link has not been used yet. Identical for a claim whose link
+
+            is simply unclicked and for one raised against an address that already had an account.
+
+            '
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                      message:
+                        type: string
+                      poll_after_seconds:
+                        type: integer
+                      expires_at:
+                        type: string
+                        format: date-time
+                  meta:
+                    type: object
+                    properties:
+                      request_id:
+                        type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  headers:
+    X-RateLimit-Remaining:
+      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 999
+    Retry-After:
+      description: Seconds to wait before retrying. Set on `429` responses.
+      schema:
+        type: integer
+      example: 30
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+    X-RateLimit-Reset:
+      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
+
+        response whenever a rate limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1735689600
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+    X-RateLimit-Limit:
+      description: 'Maximum requests allowed per window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1000
+  responses:
+    Conflict:
+      description: A resource with the same unique identifier already exists, or the resource is in use.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: conflict
+              message: A route with this name already exists.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    RateLimited:
+      description: 'Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
+
+        also present on non-429 responses whenever a limit is configured.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: rate_limit_exceeded
+              message: API rate limit exceeded. Please retry later.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  schemas:
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: 'OAuth 2.1 authentication — recommended for new integrations. Access tokens
+
+        (`kc_` prefix) are minted at the root-host token endpoint
+
+        `https://api.knoxcall.com/oauth/token` and passed as `Authorization: Bearer <access_token>`.
+
+        Public clients must use PKCE with the `authorization_code` grant; confidential
+
+        clients may use `client_credentials`. The first-party SDKs and the
+
+        `knoxcall login` CLI handle token minting, caching, refresh, and DPoP for you.
+
+        '
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+        authorizationCode:
+          authorizationUrl: https://api.knoxcall.com/oauth/authorize
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+    PhantomToken:
+      type: http
+      scheme: bearer
+      description: "The AI **data plane** credential — a `kp_`-prefixed capability token, not a\nManagement API credential. It is minted per agent (or per MCP resource) at\n`POST /v1/ai-gateway/agents/{agentId}/tokens`, or exchanged from a CI workload's\nOIDC token at `POST /v1/oauth/token`, and it is the ONLY credential `/v1/ai/*`\naccepts: an OAuth `kc_` access token or a `tk_` API key is refused there, and a\n`kp_` token is refused on `api.knoxcall.com`.\n\nThree header spellings are accepted, so an existing provider SDK can be pointed at\nthe agent URL without rewriting its auth:\n\n    Authorization: Bearer kp_live_a_...\n    x-api-key: kp_live_a_...\n    x-knox-ai-key: kp_live_a_...\n\n`kp_live_` is refused on the sandbox host and `kp_test_` on the Live host — the env\nsegment is enforced, not cosmetic. DPoP-bound tokens additionally require a valid\n`DPoP` proof header on every request, signed over the canonical public URL rather\nthan a rewritten `Host`.\n\nA rejected credential answers `401`/`403` in the data-plane error envelope with the\ncause in `code` and in the `X-Auth-Failure` response header.\n"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Legacy long-lived API key authentication via the Authorization header.
+
+        Pass your API key as: `Authorization: Bearer tk_xxx_yyy`.
+
+
+        Standard keys (`tk_` prefix) are accepted on `api.knoxcall.com`.
+
+        Test keys (type=test) are accepted on `sandbox.knoxcall.com`.
+
+        Enterprise Access Keys (`AKE` prefix) are accepted on both.
+
+
+        Fully supported, but prefer the `OAuth2` scheme (or the SDKs, which handle
+
+        OAuth for you) for new integrations.
+
+        '
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: 'Legacy API key authentication via the `x-api-key` header.
+
+        This is an alternative to Bearer token authentication for clients that cannot
+
+        set the `Authorization` header. Prefer the `OAuth2` scheme for new integrations.
+
+        '
+    CapabilityTokenAuth:
+      type: http
+      scheme: bearer
+      description: 'Single-use client capability token (`kct_` prefix), passed as
+
+        `Authorization: Bearer kct_...`. Minted server-side via
+
+        `POST /client-tokens` and bound either to one exact payload + action
+
+        (`decrypt`, `detokenize`) or to one vault + a closed set of page
+
+        origins (`tokenize`). This is NOT an API key — it authenticates only
+
+        the `POST /client/decrypt`, `POST /client/detokenize` and
+
+        `POST /client/tokenize` consume endpoints and is invalidated after its
+
+        first use.
+
+        '

@@ -1,36 +1,95 @@
 aid: knoxcall
+
 name: KnoxCall
+
 description: KnoxCall provides a secure API key management platform that stores third‑party API keys (such as Stripe, OpenAI, and many others)
   and injects them at egress. This enables applications, CI pipelines, and AI agents to use revocable tokens instead of permanent credentials,
   reducing risk of key leakage. The service offers features like token revocation, usage monitoring, and integration with popular developer tools,
   helping teams protect their secret keys while maintaining seamless access to external services.
+
+image: https://knoxcall.com/og-image.png
+
 url: https://raw.githubusercontent.com/api-evangelist/knoxcall/refs/heads/main/apis.yml
+
 x-type: company
+
 x-source: harvest:g2-catalog
-x-tier: stub
-x-tier-reason: harvest
+
+x-tier: profiled
+x-tier-reason: enrichment pass 2026-10-18 (modular-v1; was harvest)
+
 specificationVersion: '0.20'
+
 created: '2026-10-18'
+
 modified: '2026-10-18'
+
 tags:
 - Company
 - API-Management
 - Security
 - DevOps
 - AI-Agents
-apis:
-- name: KnoxCall API
-  description: Client Management API for KnoxCall
-  humanURL: https://docs.knoxcall.com/api-reference
-  baseURL: https://api.knoxcall.com/v1
-  properties: []
-  aid: knoxcall:knoxcall-api
+
 maintainers:
 - FN: Kin Lane
   email: kin@apievangelist.com
 - FN: APIs.json
   email: info@apis.io
+
 common:
+- type: AgenticAccess
+  url: agentic-access/knoxcall-agentic-access.yml
+- type: RateLimits
+  url: rate-limits/knoxcall-rate-limits.yml
+- type: Plans
+  url: plans/knoxcall-plans-pricing.yml
+- type: Spectral
+  url: rules/knoxcall-rules.yml
+- type: JSONLD
+  url: json-ld/knoxcall-context.jsonld
+- type: Vocabulary
+  url: vocabulary/knoxcall-vocabulary.yml
+- type: AgentSkill
+  url: skills/_index.yml
+- type: Webhooks
+  url: asyncapi/knoxcall-webhooks.yml
+- type: DataModel
+  url: data-model/knoxcall-data-model.yml
+- type: Idempotency
+  url: conventions/knoxcall-conventions.yml
+- type: Conventions
+  url: conventions/knoxcall-conventions.yml
+- type: Compliance
+  url: https://knoxcall.com/trust
+- type: Authentication
+  url: authentication/knoxcall-authentication.yml
+- type: ErrorCatalog
+  url: errors/knoxcall-problem-types.yml
+- type: Conformance
+  url: conformance/knoxcall-conformance.yml
+- type: LLMsTxt
+  url: llms/knoxcall-llms.txt
+- type: AgentCard
+  url: a2a/knoxcall-a2a.yml
+- type: SecurityTxt
+  url: well-known/knoxcall-security.txt
+- type: SecurityTxt
+  url: well-known/knoxcall-api-security.txt
+- type: WellKnown
+  url: well-known/knoxcall-well-known.yml
+- type: Hosts
+  url: hosts/knoxcall-hosts.yml
+- type: Vendors
+  url: vendors/knoxcall-vendors.yml
+- type: Packages
+  url: packages/knoxcall-packages.yml
+- type: Security
+  url: https://knoxcall.com/security
+- type: SDKs
+  url: https://knoxcall.com/sdk
+- type: OAuthScopes
+  url: scopes/knoxcall-scopes.yml
 - type: TrustCenter
   url: security/knoxcall-trust-center.yml
 - type: VulnerabilityDisclosure
@@ -63,3 +122,565 @@ common:
   url: https://knoxcall.com/register
 - type: Postman
   url: https://www.postman.com/knoxcall/workspace
+
+apis:
+- aid: knoxcall:knoxcall-account-api
+  name: KnoxCall Account API
+  description: Retrieve account information and usage metrics.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Account
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-account-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-agents-api
+  name: KnoxCall Agents API
+  description: Manage BYO server agents (self-hosted data-plane / tunnel agents).
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Agents
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-agents-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-ai-gateway-api
+  name: KnoxCall AI Gateway API
+  description: >-
+    Manage AI egress gateways, their agents, and capability (phantom) tokens, plus cost/token spend rollups
+    and FinOps exports.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - AI Gateway
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-ai-gateway-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-api-keys-api
+  name: KnoxCall API Keys API
+  description: Create and revoke API keys for programmatic access.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - API Keys
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-api-keys-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-audit-logs-api
+  name: KnoxCall Audit Logs API
+  description: Query the immutable audit trail of all API actions.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Audit Logs
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-audit-logs-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-client-tokens-api
+  name: KnoxCall Client Tokens API
+  description: >-
+    Single-use client-side capability tokens (`kct_` prefix) that let a browser exchange one bound ciphertext
+    or vault token for its plaintext.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Client Tokens
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-client-tokens-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-clients-api
+  name: KnoxCall Clients API
+  description: Manage authorized clients (users or servers) with IP-based access control.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Clients
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-clients-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-crypto-keys-api
+  name: KnoxCall Crypto Keys API
+  description: >-
+    Transit encryption keys — encrypt, decrypt, rewrap, sign, verify, and issue JWTs without key material
+    ever leaving KnoxCall.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Crypto Keys
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-crypto-keys-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-dynamic-db-credentials-api
+  name: KnoxCall Dynamic DB Credentials API
+  description: >-
+    Just-in-time database credentials — register connections and roles, then mint short-lived leased users
+    on demand.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Dynamic DB Credentials
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-dynamic-db-credentials-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-encryption-api
+  name: KnoxCall Encryption API
+  description: >-
+    Portable structure-preserving encryption — encrypt any JSON into storable `kc:` ciphertext strings
+    and decrypt them later.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Encryption
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-encryption-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-environments-api
+  name: KnoxCall Environments API
+  description: >-
+    Manage deployment environments (e.g. production, staging) for route configuration overrides.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Environments
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-environments-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-ephemeral-proxy-api
+  name: KnoxCall Ephemeral Proxy API
+  description: >-
+    One-shot proxy that resolves vault-token template expressions on the wire — no pre-configured route
+    required.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Ephemeral Proxy
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-ephemeral-proxy-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-oauth-clients-api
+  name: KnoxCall OAuth Clients API
+  description: Manage OAuth 2.1 clients used to mint access tokens for the API.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - OAuth Clients
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-oauth-clients-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-opportunities-api
+  name: KnoxCall Opportunities API
+  description: >-
+    Suggestions to turn detected outbound API usage (agent-observed or gateway-traffic) into a durable
+    route; accept promotes to a route + secret binding.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Opportunities
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-opportunities-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-pki-api
+  name: KnoxCall PKI API
+  description: >-
+    Private certificate authority — roots, issuing roles, leaf certificates, revocation, and CRLs.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - PKI
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-pki-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-request-logs-api
+  name: KnoxCall Request Logs API
+  description: >-
+    The per-call proxy request log, and Merkle inclusion proofs that make an anchored entry provable to
+    a third party.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Request Logs
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-request-logs-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-routes-api
+  name: KnoxCall Routes API
+  description: Manage proxy routes that forward API requests to upstream targets.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Routes
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-routes-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-secrets-api
+  name: KnoxCall Secrets API
+  description: Manage encrypted secrets injected into route headers and bodies.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Secrets
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-secrets-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-signup-api
+  name: KnoxCall Signup API
+  description: >-
+    Headless account creation — the only unauthenticated endpoint, designed so scripts and AI agents can
+    onboard without a browser.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Signup
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-signup-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-vaults-api
+  name: KnoxCall Vaults API
+  description: >-
+    Data tokenization vaults — swap sensitive values for format-preserving tokens and detokenize them
+    under audit.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Vaults
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-vaults-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-webhook-events-api
+  name: KnoxCall Webhook Events API
+  description: The Webhook Events API from KnoxCall — 0 operation(s) for webhook events.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Webhook Events
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-webhook-events-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-webhooks-api
+  name: KnoxCall Webhooks API
+  description: Manage webhook subscriptions for real-time event notifications.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Webhooks
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-webhooks-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-workflows-api
+  name: KnoxCall Workflows API
+  description: >-
+    Create, manage, and run workflows. Executions are asynchronous; poll executions or subscribe a webhook
+    to workflow.execution.completed|failed.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Workflows
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-workflows-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+- aid: knoxcall:knoxcall-wrap-credentials-api
+  name: KnoxCall Wrap Credentials API
+  description: >-
+    Escrow a third-party provider key into KnoxCall custody so it leaves your codebase, host-pinned; the
+    ephemeral proxy injects it under X-Knox-Upstream-Auth-Secret.
+  humanURL: https://docs.knoxcall.com/api-reference
+  baseURL: https://api.knoxcall.com/v1
+  tags:
+  - Wrap Credentials
+  properties:
+  - type: OpenAPI
+    url: openapi/knoxcall-wrap-credentials-api-openapi.yml
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-agent-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-update-ai-gateway-agent-request-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-ai-gateway-mcp-server-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-request-log-schema.json
+  - type: JSONSchema
+    url: json-schema/knoxcall-create-webhook-request-schema.json
+x-enrichment:
+  date: '2026-10-18'
+  status: enriched
+  artifacts_added: 44
+  pass: modular-v1
+  engine: identity=local,contract=local,surfaces=local,docs=local,regulatory=local

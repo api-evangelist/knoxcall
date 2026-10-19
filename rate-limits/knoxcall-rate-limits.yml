@@ -1,0 +1,66 @@
+generated: '2026-10-18'
+method: searched
+generator: extract-docs-artifacts.py (local)
+source: https://docs.knoxcall.com/advanced/rate-limiting
+sources:
+- https://docs.knoxcall.com/advanced/rate-limiting
+- https://docs.knoxcall.com/api-reference/rate-limits
+- https://docs.knoxcall.com/essentials/rate-limiting/overview
+name: KnoxCall rate limits
+limits:
+- name: Tenant-Level Free Plan
+  limit_text: 100 requests/minute
+  max: 100
+  window: minute
+  scope: tenant
+  plan: Free
+- name: Tenant-Level Standard Plan
+  limit_text: 1,000 requests/minute
+  max: 1000
+  window: minute
+  scope: tenant
+  plan: Standard
+- name: Tenant-Level Pro Plan
+  limit_text: 5,000 requests/minute
+  max: 5000
+  window: minute
+  scope: tenant
+  plan: Pro
+- name: Tenant-Level Enterprise Plan
+  limit_text: 10,000 requests/minute
+  max: 10000
+  window: minute
+  scope: tenant
+  plan: Enterprise
+- name: Route-Level Example
+  limit_text: 10,000 requests/hour
+  max: 10000
+  window: hour
+  scope: route
+- name: Client-Level Example
+  limit_text: 1,000 requests/hour
+  max: 1000
+  window: hour
+  scope: client
+- name: Method-Specific GET
+  limit_text: 5,000/hour
+  max: 5000
+  window: hour
+  scope: method
+- name: Method-Specific POST
+  limit_text: 1,000/hour
+  max: 1000
+  window: hour
+  scope: method
+- name: Method-Specific DELETE
+  limit_text: 100/hour
+  max: 100
+  window: hour
+  scope: method
+headers:
+- X-RateLimit-Limit
+- X-RateLimit-Remaining
+- X-RateLimit-Reset
+- Retry-After
+exhaustion_status: 429
+docs: https://docs.knoxcall.com/advanced/rate-limiting

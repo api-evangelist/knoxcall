@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/api-evangelist/knoxcall/main/json-schema/knoxcall-create-webhook-request-schema.json",
+  "title": "CreateWebhookRequest",
+  "x-generated": "2026-10-18",
+  "x-method": "derived",
+  "x-generator": "derive-json-schema.py",
+  "x-source": "openapi/knoxcall-openapi.json#/components/schemas/CreateWebhookRequest",
+  "type": "object",
+  "required": [
+    "name",
+    "url",
+    "event_types"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable name for the webhook."
+    },
+    "description": {
+      "type": "string",
+      "description": "Optional description."
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URL to deliver webhook payloads to."
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH"
+      ],
+      "description": "HTTP method for delivery.",
+      "default": "POST"
+    },
+    "event_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Event types to subscribe to. Must contain at least one event type.\nValid event types: `request.received`, `request.success`, `request.redirect`,\n`request.client_error`, `request.server_error`, `request.timeout`,\n`request.error`, `request.completed`, `audit.event`. The full catalog\nis available at `GET /webhooks/event-types`.\n\n`audit.event` delivers every audit entry, with sanitised `details`, to\nthis URL. Creating a webhook subscribed to it, or making any change to one\nthat stays subscribed (including a rename or `enabled: false`), requires\nwhat reading `details` requires: `audit_log:list` for an API key or OAuth\nclient, or an Admin or Owner holder for a user-bound token. Otherwise the\nrequest is refused with `403 forbidden`. An OAuth token narrowed by scope\nmust also hold a scope that reads the audit log (`audit-logs:read`), or\nthe request is refused with `403 insufficient_scope`. Deleting the\nwebhook is not affected.\n"
+    },
+    "auth_type": {
+      "type": "string",
+      "enum": [
+        "none",
+        "bearer",
+        "basic",
+        "header",
+        "hmac"
+      ],
+      "description": "Authentication method for delivery requests.",
+      "default": "none"
+    },
+    "auth_config": {
+      "type": "object",
+      "description": "Authentication configuration. Structure depends on `auth_type`:\n- `bearer`: `{ \"token\": \"...\" }`\n- `basic`: `{ \"username\": \"...\", \"password\": \"...\" }`\n- `header`: `{ \"header_name\": \"...\", \"header_value\": \"...\" }`\n- `hmac`: `{ \"secret\": \"...\" }`\n"
+    },
+    "request_headers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Custom headers to include with delivery requests."
+    },
+    "route_filter": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Optional route ID to scope events to a single route."
+    },
+    "include_request_body": {
+      "type": "boolean",
+      "description": "Include the original request body in the payload.",
+      "default": true
+    },
+    "include_response_body": {
+      "type": "boolean",
+      "description": "Include the upstream response body in the payload.",
+      "default": false
+    },
+    "include_headers": {
+      "type": "boolean",
+      "description": "Include request/response headers in the payload.",
+      "default": false
+    },
+    "timeout_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 300,
+      "description": "Delivery timeout in seconds.",
+      "default": 30
+    },
+    "retry_on_failure": {
+      "type": "boolean",
+      "description": "Retry failed deliveries.",
+      "default": true
+    },
+    "max_retries": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Maximum retry attempts.",
+      "default": 3
+    },
+    "enabled": {
+      "type": "boolean",
+      "description": "Whether the webhook is active on creation.",
+      "default": true
+    },
+    "hmac_key_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Sign deliveries with this transit (crypto) key instead of the webhook's generated `secret_key`."
+    },
+    "hmac_format": {
+      "type": "string",
+      "enum": [
+        "legacy",
+        "stripe",
+        "github",
+        "slack",
+        "aws-sns",
+        "custom"
+      ],
+      "description": "Wire format for the HMAC signature header."
+    },
+    "hmac_header_name": {
+      "type": "string",
+      "description": "Header carrying the signature. Required when `hmac_format` is `custom`."
+    }
+  }
+}

@@ -1,0 +1,1331 @@
+openapi: 3.2.0
+info:
+  title: KnoxCall Client Management Crypto Keys API
+  version: '1.0'
+  description: 'The KnoxCall Client Management API provides programmatic access to manage your API gateway
+
+    resources including routes, secrets, clients, environments, webhooks, and API keys. ## Authentication
+
+
+    All requests must include an OAuth 2.1 access token **or** a legacy API key. The
+
+    recommended path for new integrations is the first-party SDKs, which mint, cache, and
+
+    refresh OAuth tokens for you (start with `knoxcall login` on a developer machine, or
+
+    `KNOXCALL_CLIENT_ID` / `KNOXCALL_CLIENT_SECRET` in CI). You can authenticate using any of:
+
+
+    - **Authorization header (OAuth 2.1 bearer token — recommended)**: `Authorization: Bearer `
+
+    - **Authorization header (legacy API key)**: `Authorization: Bearer tk_xxx_yyy`
+
+    - **x-api-key header (legacy API key)**: `x-api-key: tk_xxx_yyy`
+
+
+    OAuth 2.1 access tokens (`kc_` prefix) are minted at the root-host token endpoint
+
+    `https://api.knoxcall.com/oauth/token` (not under `/v1`) using the `client_credentials`
+
+    or `authorization_code` grant. See the `OAuth2` security scheme and the `/oauth/*`
+
+    endpoints. Some resources that are managed exclusively through OAuth reject API-key auth
+
+    with a `403 use_oauth` error. Long-lived API keys remain fully supported. They come in three types:
+
+    - **Standard keys** (`tk_` prefix) are used on the production API (`api.knoxcall.com`). - **Test keys** (`tk_` prefix, type=test) are used on the sandbox API (`sandbox.knoxcall.com`). - **Enterprise Access Keys** (`AKE` prefix) follow the format `AKE[16chars]:[40chars]`. Using a test key on the production API (or vice versa) will return a `403 wrong_key_type` error. ## Request IDs
+
+
+    Every response — success or error — includes an `X-Request-Id` response header (a UUID). Its value is identical to the `request_id` field in the response body (`meta.request_id`
+
+    on success, `error.request_id` on error). Quote it when contacting support. ## API Versioning
+
+
+    The API is versioned on two axes:
+
+
+    - **Major version — the `/v1` path prefix.** Breaking changes ship under a new major
+
+    (`/v2`). `/v1` never receives a breaking change. - **Minor version — the `KnoxCall-Version` header (dated, `YYYY-MM-DD`).** Send
+
+    `KnoxCall-Version: 2026-08-05` to pin the behaviour of a specific dated release. Omit
+
+    the header to get the newest minor version. Every response echoes the resolved version
+
+    back in a `KnoxCall-Version` response header. Within a major version, **additive changes are not breaking** and may appear without a new
+
+    dated version: new endpoints, new optional request fields, new response fields, new
+
+    `error.type` values, and new enum members. Clients must tolerate unknown response fields
+
+    and unknown `error.type` values (see the `ErrorResponse` schema). An **unknown or malformed** `KnoxCall-Version` value returns `400` with
+
+    `error.type: invalid_api_version`. ## Rate Limiting
+
+
+    API keys can have optional rate limits configured. When a limit is configured, the
+
+    following headers are emitted on **every** response (not only `429`s):
+
+    - `X-RateLimit-Limit` -- maximum requests allowed per window
+
+    - `X-RateLimit-Remaining` -- remaining requests in the current window
+
+    - `X-RateLimit-Reset` -- epoch seconds at which the window resets
+
+
+    When the limit is exceeded the API returns `429` (`rate_limit_exceeded` / `rate_limited`)
+
+    and additionally sets `Retry-After` (seconds until the window resets). ## DPoP sender-constrained tokens, and the server nonce
+
+
+    A token minted with a `cnf.jkt` binding (DPoP, RFC 9449) requires a `DPoP` proof header
+
+    on every request, signed over the request''s method and canonical public URL. **Every response to a request that carried a `DPoP` header also carries a
+
+    `DPoP-Nonce` response header** -- mints, refusals and successful calls alike, on
+
+    `POST /oauth/token`, `/v1`, the tenant data plane, the self-hosted proxy and the AI
+
+    gateway. The value is stateless and changes every minute; the server accepts the current
+
+    and the previous minute''s, so a nonce is good for 60-120 seconds.'
+  contact:
+    name: KnoxCall Support
+    url: https://knoxcall.com
+    email: support@knoxcall.com
+  license:
+    name: Proprietary
+    url: https://knoxcall.com/terms
+servers:
+- url: https://api.knoxcall.com/v1
+  description: Production
+- url: https://sandbox.knoxcall.com/v1
+  description: Sandbox (test keys only)
+security:
+- OAuth2: []
+- BearerAuth: []
+- ApiKeyAuth: []
+tags:
+- name: Crypto Keys
+  description: Transit encryption keys — encrypt, decrypt, rewrap, sign, verify, and issue JWTs without key material ever leaving KnoxCall.
+paths:
+  /crypto/keys:
+    get:
+      operationId: listCryptoKeys
+      summary: List crypto keys
+      description: Returns all transit keys, sorted by name (not paginated).
+      tags:
+      - Crypto Keys
+      responses:
+        '200':
+          description: List of transit keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TransitKey'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createCryptoKey
+      summary: Create a crypto key
+      description: 'Creates a transit key. Key material never leaves KnoxCall — all
+
+        operations happen server-side via the encrypt/decrypt/sign endpoints.
+
+        Asymmetric key types (RSA, ECDSA, Ed25519) require a Pro or Enterprise
+
+        plan.'
+      tags:
+      - Crypto Keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransitKeyRequest'
+            example:
+              name: orders-key
+              key_type: aes256-gcm
+      responses:
+        '200':
+          description: The created key.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TransitKey'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: 'Payment Required — this action exceeds your plan''s limits. Asymmetric key
+
+            algorithms (and other gated features) require a paid plan, or a resource quota
+
+            was reached. `error.type: plan_limit`.
+
+            '
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            KnoxCall-Version:
+              $ref: '#/components/headers/KnoxCall-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  type: plan_limit
+                  message: Asymmetric keys require a paid plan.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    get:
+      operationId: getCryptoKey
+      summary: Get crypto key details
+      tags:
+      - Crypto Keys
+      responses:
+        '200':
+          description: Key details.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TransitKey'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateCryptoKey
+      summary: Update a crypto key
+      description: 'Sets the per-key destroy safety latch, `deletion_allowed`.
+
+
+        A key version can only be destroyed while this is `true`, so a
+
+        cryptographic erasure — which nothing can undo — is never one call
+
+        away. Every new key is created with it `false`. The recommended
+
+        sequence is: raise the latch, destroy the version, lower it again.
+
+
+        Each change writes a `transit.key.deletion_allowed` audit row
+
+        recording the previous and the new value.'
+      tags:
+      - Crypto Keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - deletion_allowed
+              properties:
+                deletion_allowed:
+                  type: boolean
+                  description: Whether `DELETE /crypto/keys/{name}/versions/{version}` is permitted on this key. Must be a boolean — a string is rejected with a 400 rather than coerced.
+            example:
+              deletion_allowed: true
+      responses:
+        '200':
+          description: The latch's new value.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: customer-pii
+                      deletion_allowed:
+                        type: boolean
+                        example: true
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/rotate:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    post:
+      operationId: rotateCryptoKey
+      summary: Rotate a crypto key
+      description: Mints a new key version. New encryptions use the new version; old ciphertexts stay decryptable until their version is destroyed.
+      tags:
+      - Crypto Keys
+      responses:
+        '200':
+          description: Rotation result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      new_version:
+                        type: integer
+                        example: 2
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/versions/{version}:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    - name: version
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 2147483647
+      description: The key version to destroy. Versions are stored as a 32-bit integer; a value above 2147483647 is rejected with a 400.
+    delete:
+      operationId: destroyCryptoKeyVersion
+      summary: Destroy a key version
+      description: 'Cryptographically erases one key version. Ciphertexts produced with
+
+        that version become permanently undecryptable.
+
+
+        Two preconditions, each refused with a **409** carrying a machine-
+
+        readable `error.type`:
+
+
+        - `deletion_not_allowed` — the parent key''s `deletion_allowed` latch is
+
+        `false`. Raise it with `PATCH /crypto/keys/{name}`, destroy, then
+
+        lower it again.
+
+        - `active_version` — the version named is the key''s current active
+
+        version. Rotate the key first.
+
+
+        Neither is a server fault, so neither should be retried unchanged.'
+      tags:
+      - Crypto Keys
+      responses:
+        '200':
+          description: Version destroyed. `destroyed` echoes the version number.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      destroyed:
+                        type: integer
+                        example: 1
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: A destroy precondition is not met. `error.type` is `deletion_not_allowed` (raise the key's `deletion_allowed` latch first) or `active_version` (rotate the key first).
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            KnoxCall-Version:
+              $ref: '#/components/headers/KnoxCall-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  type: deletion_not_allowed
+                  message: Destroy is not allowed on key 'customer-pii'. Set deletion_allowed = true on the key first (PATCH /v1/crypto/keys/customer-pii), destroy the version, then set it back to false.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/encrypt:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    post:
+      operationId: transitEncrypt
+      summary: Encrypt data
+      description: Encrypts a payload with the key's active version. Supply `plaintext` (UTF-8) or `plaintext_b64` (base64 for binary).
+      tags:
+      - Crypto Keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plaintext:
+                  type: string
+                  description: UTF-8 plaintext.
+                plaintext_b64:
+                  type: string
+                  description: Base64-encoded plaintext (for binary payloads). Takes precedence over `plaintext`.
+            example:
+              plaintext: 4111 1111 1111 1111
+      responses:
+        '200':
+          description: The ciphertext.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      ciphertext:
+                        type: string
+                      key_version:
+                        type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/decrypt:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    post:
+      operationId: transitDecrypt
+      summary: Decrypt data
+      description: 'Decrypts a ciphertext produced by this key. By default the plaintext
+
+        is returned base64-encoded (`plaintext_b64`); pass `?format=utf8` to
+
+        receive it as a UTF-8 string (`plaintext`) instead.'
+      tags:
+      - Crypto Keys
+      parameters:
+      - name: format
+        in: query
+        schema:
+          type: string
+          enum:
+          - utf8
+        description: Return the plaintext as UTF-8 instead of base64.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - ciphertext
+              properties:
+                ciphertext:
+                  type: string
+      responses:
+        '200':
+          description: The plaintext (base64 by default, UTF-8 with `?format=utf8`).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      plaintext_b64:
+                        type: string
+                        description: Base64 plaintext (default response form).
+                      plaintext:
+                        type: string
+                        description: UTF-8 plaintext (only with `?format=utf8`).
+                      key_version:
+                        type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/rewrap:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    post:
+      operationId: transitRewrap
+      summary: Rewrap a ciphertext
+      description: Re-encrypts a ciphertext from an older key version to the active version. No plaintext crosses the wire.
+      tags:
+      - Crypto Keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - ciphertext
+              properties:
+                ciphertext:
+                  type: string
+      responses:
+        '200':
+          description: The rewrapped ciphertext.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      ciphertext:
+                        type: string
+                      key_version:
+                        type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/sign:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    post:
+      operationId: transitSign
+      summary: Sign data
+      description: 'Signs a payload. HMAC keys produce an HMAC; asymmetric keys (RSA,
+
+        ECDSA, Ed25519) produce a signature. Supply `data` (UTF-8) or
+
+        `data_b64` (base64). RSA keys accept optional `rsa_padding`
+
+        (`pkcs1v15` default, or `pss`) and `hash` (`sha256`/`sha384`/`sha512`).'
+      tags:
+      - Crypto Keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: string
+                  description: UTF-8 payload.
+                data_b64:
+                  type: string
+                  description: Base64 payload. Takes precedence over `data`.
+                rsa_padding:
+                  type: string
+                  enum:
+                  - pkcs1v15
+                  - pss
+                  description: RSA keys only.
+                hash:
+                  type: string
+                  enum:
+                  - sha256
+                  - sha384
+                  - sha512
+                  description: Asymmetric keys only.
+      responses:
+        '200':
+          description: The signature.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      signature:
+                        type: string
+                      key_version:
+                        type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/verify:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    post:
+      operationId: transitVerify
+      summary: Verify a signature
+      description: Verifies a signature produced by this key. Same dispatch and optional fields as sign.
+      tags:
+      - Crypto Keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - signature
+              properties:
+                data:
+                  type: string
+                data_b64:
+                  type: string
+                signature:
+                  type: string
+                rsa_padding:
+                  type: string
+                  enum:
+                  - pkcs1v15
+                  - pss
+                hash:
+                  type: string
+                  enum:
+                  - sha256
+                  - sha384
+                  - sha512
+      responses:
+        '200':
+          description: Verification result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      valid:
+                        type: boolean
+                      key_version:
+                        type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/public-key:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    get:
+      operationId: getCryptoPublicKey
+      summary: Get public key
+      description: Returns the PEM + JWK public key for an asymmetric key's active version, or a specific version via `?version=N`.
+      tags:
+      - Crypto Keys
+      parameters:
+      - name: version
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        description: Specific key version. Defaults to the active version. Versions are stored as a 32-bit integer; a value above 2147483647 is rejected with a 400.
+      responses:
+        '200':
+          description: The public key.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      pem:
+                        type: string
+                      jwk:
+                        type: object
+                        additionalProperties: true
+                      key_version:
+                        type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/jwt:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    post:
+      operationId: transitSignJwt
+      summary: Sign a JWT
+      description: Signs a compact JWT with the key. The algorithm is derived from the key type.
+      tags:
+      - Crypto Keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - claims
+              properties:
+                claims:
+                  type: object
+                  additionalProperties: true
+                  description: JWT claims payload.
+                header_overrides:
+                  type: object
+                  additionalProperties: true
+                  description: Optional extra JOSE header fields.
+            example:
+              claims:
+                sub: user-123
+                aud: my-api
+      responses:
+        '200':
+          description: The signed JWT.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      key_version:
+                        type: integer
+                      alg:
+                        type: string
+                        example: ES256
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/jwt/verify:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    post:
+      operationId: transitVerifyJwt
+      summary: Verify a JWT
+      description: Verifies a compact JWT signed by this key and returns its claims when valid.
+      tags:
+      - Crypto Keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - token
+              properties:
+                token:
+                  type: string
+                expected:
+                  type: object
+                  description: Optional expected claim values.
+                  properties:
+                    iss:
+                      type: string
+                    aud:
+                      type: string
+                    sub:
+                      type: string
+                    clock_skew_seconds:
+                      type: integer
+      responses:
+        '200':
+          description: Verification result. All fields except `valid` are optional.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      valid:
+                        type: boolean
+                      claims:
+                        type: object
+                        additionalProperties: true
+                      key_version:
+                        type: integer
+                      alg:
+                        type: string
+                      kid:
+                        type: string
+                      error:
+                        type: string
+                        description: Failure reason when `valid` is false.
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /crypto/keys/{name}/webhook-sign:
+    parameters:
+    - $ref: '#/components/parameters/CryptoKeyName'
+    post:
+      operationId: transitWebhookSign
+      summary: Sign a webhook payload
+      description: 'Returns a Stripe-format webhook signature header
+
+        (`t=,v1=`) over the payload. HMAC keys only. `format`
+
+        currently accepts only `stripe`.'
+      tags:
+      - Crypto Keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payload:
+                  type: string
+                  description: UTF-8 payload.
+                payload_b64:
+                  type: string
+                  description: Base64 payload. Takes precedence over `payload`.
+                timestamp_seconds:
+                  type: integer
+                  minimum: 0
+                  description: Unix timestamp to sign with. Defaults to now.
+                format:
+                  type: string
+                  enum:
+                  - stripe
+                  default: stripe
+      responses:
+        '200':
+          description: The signature header.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      signature_header:
+                        type: string
+                        example: t=1735689600,v1=5257a869e7...
+                      timestamp_seconds:
+                        type: integer
+                      key_version:
+                        type: integer
+                      format:
+                        type: string
+                        example: stripe
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  parameters:
+    CryptoKeyName:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9_-]+$
+      description: The transit key name.
+      example: orders-key
+  schemas:
+    RequestMeta:
+      type: object
+      description: Metadata included with every API response.
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    CreateTransitKeyRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          pattern: ^[a-zA-Z0-9_-]+$
+          description: Machine name for the key (alphanumeric plus hyphens and underscores).
+          example: orders-key
+        key_type:
+          type: string
+          enum:
+          - aes256-gcm
+          - hmac-sha256
+          - hmac-sha512
+          - rsa-2048
+          - rsa-3072
+          - rsa-4096
+          - ecdsa-p256
+          - ecdsa-p384
+          - ed25519
+          - ecdh-p256
+          default: aes256-gcm
+          description: Key algorithm. Asymmetric types (RSA, ECDSA, Ed25519) require a Pro or Enterprise plan.
+        mode:
+          type: string
+          enum:
+          - cloud-only
+          - bundled
+          description: '`cloud-only` (default) keys never leave KnoxCall; `bundled` keys can be exported wrapped for edge use.'
+        description:
+          type: string
+    TransitKey:
+      type: object
+      description: 'A transit encryption key. Key material never leaves KnoxCall.
+
+        The list endpoint returns a projection without `tenant_id`,
+
+        `created_by`, and `sandbox`.
+
+        '
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 1f2e3d4c-5b6a-4798-8d9e-0a1b2c3d4e5f
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: orders-key
+        key_type:
+          type: string
+          enum:
+          - aes256-gcm
+          - hmac-sha256
+          - hmac-sha512
+          - rsa-2048
+          - rsa-3072
+          - rsa-4096
+          - ecdsa-p256
+          - ecdsa-p384
+          - ed25519
+          - ecdh-p256
+          example: aes256-gcm
+        mode:
+          type: string
+          enum:
+          - cloud-only
+          - bundled
+          description: '`cloud-only` keys never leave KnoxCall; `bundled` keys can be exported wrapped for edge use.'
+        current_version:
+          type: integer
+          description: The active key version. Rotation increments this.
+          example: 1
+        deletion_allowed:
+          type: boolean
+          description: Whether key versions may be destroyed.
+        description:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type:
+          - string
+          - 'null'
+          description: The API key or user that created the key.
+        sandbox:
+          type: boolean
+          description: Whether this key lives in Test (sandbox) mode.
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
+  headers:
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+  responses:
+    Conflict:
+      description: A resource with the same unique identifier already exists, or the resource is in use.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: conflict
+              message: A route with this name already exists.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    Forbidden:
+      description: 'The key is authenticated but not authorized for this action (missing scope), a plan
+
+        limit was reached, or the resource must be managed via OAuth (`use_oauth`) / is a
+
+        protected system client (`system_client_protected`).
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              summary: Missing scope
+              value:
+                error:
+                  type: forbidden
+                  message: This key is not authorized to list AI gateways.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            use_oauth:
+              summary: Resource is OAuth-only
+              value:
+                error:
+                  type: use_oauth
+                  message: This resource must be managed with an OAuth 2.1 access token.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            system_client_protected:
+              summary: Protected system client
+              value:
+                error:
+                  type: system_client_protected
+                  message: This client is managed by the platform and cannot be modified.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    InternalError:
+      description: An unexpected server error occurred.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: internal_error
+              message: An unexpected error occurred.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    Unauthorized:
+      description: Authentication is required or the provided API key is invalid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_key:
+              summary: No API key provided
+              value:
+                error:
+                  type: authentication_required
+                  message: 'API key is required. Use Authorization: Bearer <api_key> or x-api-key header.'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_key:
+              summary: Invalid API key
+              value:
+                error:
+                  type: invalid_api_key
+                  message: Invalid API key.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: 'OAuth 2.1 authentication — recommended for new integrations. Access tokens
+
+        (`kc_` prefix) are minted at the root-host token endpoint
+
+        `https://api.knoxcall.com/oauth/token` and passed as `Authorization: Bearer <access_token>`.
+
+        Public clients must use PKCE with the `authorization_code` grant; confidential
+
+        clients may use `client_credentials`. The first-party SDKs and the
+
+        `knoxcall login` CLI handle token minting, caching, refresh, and DPoP for you.
+
+        '
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+        authorizationCode:
+          authorizationUrl: https://api.knoxcall.com/oauth/authorize
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+    PhantomToken:
+      type: http
+      scheme: bearer
+      description: "The AI **data plane** credential — a `kp_`-prefixed capability token, not a\nManagement API credential. It is minted per agent (or per MCP resource) at\n`POST /v1/ai-gateway/agents/{agentId}/tokens`, or exchanged from a CI workload's\nOIDC token at `POST /v1/oauth/token`, and it is the ONLY credential `/v1/ai/*`\naccepts: an OAuth `kc_` access token or a `tk_` API key is refused there, and a\n`kp_` token is refused on `api.knoxcall.com`.\n\nThree header spellings are accepted, so an existing provider SDK can be pointed at\nthe agent URL without rewriting its auth:\n\n    Authorization: Bearer kp_live_a_...\n    x-api-key: kp_live_a_...\n    x-knox-ai-key: kp_live_a_...\n\n`kp_live_` is refused on the sandbox host and `kp_test_` on the Live host — the env\nsegment is enforced, not cosmetic. DPoP-bound tokens additionally require a valid\n`DPoP` proof header on every request, signed over the canonical public URL rather\nthan a rewritten `Host`.\n\nA rejected credential answers `401`/`403` in the data-plane error envelope with the\ncause in `code` and in the `X-Auth-Failure` response header.\n"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Legacy long-lived API key authentication via the Authorization header.
+
+        Pass your API key as: `Authorization: Bearer tk_xxx_yyy`.
+
+
+        Standard keys (`tk_` prefix) are accepted on `api.knoxcall.com`.
+
+        Test keys (type=test) are accepted on `sandbox.knoxcall.com`.
+
+        Enterprise Access Keys (`AKE` prefix) are accepted on both.
+
+
+        Fully supported, but prefer the `OAuth2` scheme (or the SDKs, which handle
+
+        OAuth for you) for new integrations.
+
+        '
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: 'Legacy API key authentication via the `x-api-key` header.
+
+        This is an alternative to Bearer token authentication for clients that cannot
+
+        set the `Authorization` header. Prefer the `OAuth2` scheme for new integrations.
+
+        '
+    CapabilityTokenAuth:
+      type: http
+      scheme: bearer
+      description: 'Single-use client capability token (`kct_` prefix), passed as
+
+        `Authorization: Bearer kct_...`. Minted server-side via
+
+        `POST /client-tokens` and bound either to one exact payload + action
+
+        (`decrypt`, `detokenize`) or to one vault + a closed set of page
+
+        origins (`tokenize`). This is NOT an API key — it authenticates only
+
+        the `POST /client/decrypt`, `POST /client/detokenize` and
+
+        `POST /client/tokenize` consume endpoints and is invalidated after its
+
+        first use.
+
+        '

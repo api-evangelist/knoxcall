@@ -1,0 +1,5016 @@
+openapi: 3.2.0
+info:
+  title: KnoxCall Client Management AI Gateway API
+  version: '1.0'
+  description: 'The KnoxCall Client Management API provides programmatic access to manage your API gateway
+
+    resources including routes, secrets, clients, environments, webhooks, and API keys. ## Authentication
+
+
+    All requests must include an OAuth 2.1 access token **or** a legacy API key. The
+
+    recommended path for new integrations is the first-party SDKs, which mint, cache, and
+
+    refresh OAuth tokens for you (start with `knoxcall login` on a developer machine, or
+
+    `KNOXCALL_CLIENT_ID` / `KNOXCALL_CLIENT_SECRET` in CI). You can authenticate using any of:
+
+
+    - **Authorization header (OAuth 2.1 bearer token — recommended)**: `Authorization: Bearer `
+
+    - **Authorization header (legacy API key)**: `Authorization: Bearer tk_xxx_yyy`
+
+    - **x-api-key header (legacy API key)**: `x-api-key: tk_xxx_yyy`
+
+
+    OAuth 2.1 access tokens (`kc_` prefix) are minted at the root-host token endpoint
+
+    `https://api.knoxcall.com/oauth/token` (not under `/v1`) using the `client_credentials`
+
+    or `authorization_code` grant. See the `OAuth2` security scheme and the `/oauth/*`
+
+    endpoints. Some resources that are managed exclusively through OAuth reject API-key auth
+
+    with a `403 use_oauth` error. Long-lived API keys remain fully supported. They come in three types:
+
+    - **Standard keys** (`tk_` prefix) are used on the production API (`api.knoxcall.com`). - **Test keys** (`tk_` prefix, type=test) are used on the sandbox API (`sandbox.knoxcall.com`). - **Enterprise Access Keys** (`AKE` prefix) follow the format `AKE[16chars]:[40chars]`. Using a test key on the production API (or vice versa) will return a `403 wrong_key_type` error. ## Request IDs
+
+
+    Every response — success or error — includes an `X-Request-Id` response header (a UUID). Its value is identical to the `request_id` field in the response body (`meta.request_id`
+
+    on success, `error.request_id` on error). Quote it when contacting support. ## API Versioning
+
+
+    The API is versioned on two axes:
+
+
+    - **Major version — the `/v1` path prefix.** Breaking changes ship under a new major
+
+    (`/v2`). `/v1` never receives a breaking change. - **Minor version — the `KnoxCall-Version` header (dated, `YYYY-MM-DD`).** Send
+
+    `KnoxCall-Version: 2026-08-05` to pin the behaviour of a specific dated release. Omit
+
+    the header to get the newest minor version. Every response echoes the resolved version
+
+    back in a `KnoxCall-Version` response header. Within a major version, **additive changes are not breaking** and may appear without a new
+
+    dated version: new endpoints, new optional request fields, new response fields, new
+
+    `error.type` values, and new enum members. Clients must tolerate unknown response fields
+
+    and unknown `error.type` values (see the `ErrorResponse` schema). An **unknown or malformed** `KnoxCall-Version` value returns `400` with
+
+    `error.type: invalid_api_version`. ## Rate Limiting
+
+
+    API keys can have optional rate limits configured. When a limit is configured, the
+
+    following headers are emitted on **every** response (not only `429`s):
+
+    - `X-RateLimit-Limit` -- maximum requests allowed per window
+
+    - `X-RateLimit-Remaining` -- remaining requests in the current window
+
+    - `X-RateLimit-Reset` -- epoch seconds at which the window resets
+
+
+    When the limit is exceeded the API returns `429` (`rate_limit_exceeded` / `rate_limited`)
+
+    and additionally sets `Retry-After` (seconds until the window resets). ## DPoP sender-constrained tokens, and the server nonce
+
+
+    A token minted with a `cnf.jkt` binding (DPoP, RFC 9449) requires a `DPoP` proof header
+
+    on every request, signed over the request''s method and canonical public URL. **Every response to a request that carried a `DPoP` header also carries a
+
+    `DPoP-Nonce` response header** -- mints, refusals and successful calls alike, on
+
+    `POST /oauth/token`, `/v1`, the tenant data plane, the self-hosted proxy and the AI
+
+    gateway. The value is stateless and changes every minute; the server accepts the current
+
+    and the previous minute''s, so a nonce is good for 60-120 seconds.'
+  contact:
+    name: KnoxCall Support
+    url: https://knoxcall.com
+    email: support@knoxcall.com
+  license:
+    name: Proprietary
+    url: https://knoxcall.com/terms
+servers:
+- url: https://api.knoxcall.com/v1
+  description: Production
+- url: https://sandbox.knoxcall.com/v1
+  description: Sandbox (test keys only)
+security:
+- OAuth2: []
+- BearerAuth: []
+- ApiKeyAuth: []
+tags:
+- name: AI Gateway
+  description: Manage AI egress gateways, their agents, and capability (phantom) tokens, plus cost/token spend rollups and FinOps exports.
+paths:
+  /ai-gateway/gateways:
+    get:
+      operationId: listGateways
+      summary: List AI gateways
+      description: Returns a paginated list of AI gateways for the authenticated tenant and mode. Requires the `ai_gateway` list scope.
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of AI gateways.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGateway'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createGateway
+      summary: Create an AI gateway
+      description: 'Creates an AI gateway — the top-level container that agents live under.
+
+        `name` and `slug` are required; the slug must be unique within your tenant.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAiGatewayRequest'
+            example:
+              name: Production AI
+              slug: production-ai
+              budget_monthly_usd: 500
+      responses:
+        '200':
+          description: The created gateway.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGateway'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/gateways/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The AI gateway UUID.
+    get:
+      operationId: getGateway
+      summary: Get an AI gateway
+      description: Returns a single AI gateway by id.
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The gateway.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGateway'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateGateway
+      summary: Update an AI gateway
+      description: Updates one or more fields on a gateway. Only provided fields are changed.
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAiGatewayRequest'
+            example:
+              budget_monthly_usd: 1000
+              geo_velocity_action: block
+      responses:
+        '200':
+          description: The updated gateway.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGateway'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteGateway
+      summary: Archive an AI gateway
+      description: Archives (soft-deletes) a gateway. Returns the gateway id and its new status.
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The archived gateway.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        example: archived
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/gateways/{gatewayId}/agents:
+    parameters:
+    - name: gatewayId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The parent AI gateway UUID.
+    get:
+      operationId: listGatewayAgents
+      summary: List a gateway's agents
+      description: Returns a paginated list of the agents created under a gateway.
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of agents.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGatewayAgent'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createGatewayAgent
+      summary: Create an agent
+      description: 'Creates an agent under a gateway. `name` and `slug` are required. The
+
+        response includes `agent_url` — the data-plane base URL to point an AI
+
+        SDK at. Subject to the plan''s AI-agent limit.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAiGatewayAgentRequest'
+            example:
+              name: Support Bot
+              slug: support-bot
+              default_model: claude-sonnet-5
+      responses:
+        '200':
+          description: The created agent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayAgent'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/agents/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The AI agent UUID.
+    get:
+      operationId: getAgent
+      summary: Get an agent
+      description: Returns a single agent by id (flat path, not nested under its gateway). Includes `agent_url`.
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The agent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayAgent'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateAgent
+      summary: Update an agent
+      description: Updates one or more fields on an agent. Only provided fields are changed.
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAiGatewayAgentRequest'
+            example:
+              default_model: claude-opus-4-8
+              streaming_enabled: true
+      responses:
+        '200':
+          description: The updated agent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayAgent'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteAgent
+      summary: Archive an agent
+      description: Archives (soft-deletes) an agent. Returns the agent id and its new status.
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The archived agent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        example: archived
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/agents/{agentId}/tokens:
+    parameters:
+    - name: agentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The AI agent UUID.
+    get:
+      operationId: listPhantomTokens
+      summary: List an agent's capability tokens
+      description: 'Returns a paginated list of the agent''s capability (phantom) tokens.
+
+        The plaintext token is **never** returned here — only the non-secret
+
+        prefix. The plaintext is shown once, at mint time.'
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of capability tokens.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGatewayPhantomToken'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: mintPhantomToken
+      summary: Mint a capability token
+      description: 'Mints a capability (phantom) token for the agent. The response `token`
+
+        is the plaintext and is shown **exactly once** — persist it now.
+
+        The token''s environment (live vs test) is derived server-side from the
+
+        authenticating key''s mode. Set `dpop_required` together with `dpop_jkt`
+
+        to bind the token to a DPoP key.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MintAiGatewayTokenRequest'
+            example:
+              name: ci-runner
+              kind: agent
+              expires_in_seconds: 86400
+      responses:
+        '200':
+          description: The minted token. `data.token` is the plaintext, shown once; `meta.note` restates the warning.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayPhantomTokenCreated'
+                  meta:
+                    type: object
+                    properties:
+                      request_id:
+                        type: string
+                        format: uuid
+                      note:
+                        type: string
+                        example: Save this token now — it will not be shown again.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/agents/{agentId}/tokens/{tokenId}:
+    parameters:
+    - name: agentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The AI agent UUID.
+    - name: tokenId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The capability token UUID.
+    delete:
+      operationId: revokePhantomToken
+      summary: Revoke a capability token
+      description: Revokes an agent's capability token. Already-revoked or unknown tokens return 404.
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The revoked token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      revoked:
+                        type: boolean
+                        example: true
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/gateways/{gatewayId}/tokens:
+    parameters:
+    - name: gatewayId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The AI gateway UUID.
+    get:
+      operationId: listGatewayTokens
+      summary: List every token under a gateway
+      description: 'Every phantom token under a gateway, **including gateway-level tokens
+
+        that have no agent** — the shape `POST /v1/oauth/token` mints for MCP.
+
+        The per-agent endpoint (`/ai-gateway/agents/{agentId}/tokens`) filters on
+
+        `agent_id` and therefore cannot see them.
+
+
+        Plaintext is never returned by any list endpoint.'
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of tokens. `agent_id` is null for a gateway-level token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGatewayPhantomToken'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/gateways/{gatewayId}/tokens/{tokenId}:
+    parameters:
+    - name: gatewayId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The AI gateway UUID.
+    - name: tokenId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The token UUID.
+    delete:
+      operationId: revokeGatewayToken
+      summary: Revoke a token under a gateway
+      description: 'Revokes any token under the gateway, **including a gateway-level token
+
+        with no agent**. Use this rather than the per-agent revoke when the token
+
+        came from `POST /v1/oauth/token`, which mints with no agent.
+
+
+        Revoking an already-revoked or unknown token returns `404`.'
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The revoked token id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      revoked:
+                        type: boolean
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/gateways/{gatewayId}/mcp-servers:
+    parameters:
+    - name: gatewayId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The parent AI gateway UUID.
+    get:
+      operationId: listGatewayMcpServers
+      summary: List a gateway's MCP servers
+      description: Returns a paginated list of the MCP servers registered under a gateway.
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of MCP servers.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGatewayMcpServer'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createGatewayMcpServer
+      summary: Register an MCP server
+      description: 'Registers an upstream MCP server under a gateway. KnoxCall proxies it at
+
+        `connect_url` and governs every tool call — allowlist, prompt firewall and
+
+        PII redaction — before it reaches the upstream.
+
+
+        `upstream_url` must be a public `https://` address. Private, loopback,
+
+        link-local and cloud-metadata destinations are refused at write time and
+
+        again at connect time, because the request carries the decrypted upstream
+
+        credential.
+
+
+        Every value in `auth.headers` must reference a KnoxCall secret (for
+
+        example `Bearer {{secret_id:}}`). A literal credential is refused
+
+        with `422 plaintext_auth` — storing it here would leave it in cleartext in
+
+        the control plane.
+
+
+        `server_type: collection` is not served yet and returns
+
+        `422 unsupported_server_type`.
+
+
+        An empty `allowed_tools` means the server advertises **no** tools.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAiGatewayMcpServerRequest'
+            example:
+              name: Vendor tools
+              slug: vendor-tools
+              upstream_url: https://mcp.vendor.example/mcp
+              allowed_tools:
+              - get_weather
+              - lookup_customer
+      responses:
+        '200':
+          description: The registered MCP server.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayMcpServer'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/McpUnprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/mcp-servers/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The MCP server UUID.
+    get:
+      operationId: getAiGatewayMcpServer
+      summary: Get an MCP server
+      description: Returns one MCP server, including `connect_url` and `resource`.
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The MCP server.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayMcpServer'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateAiGatewayMcpServer
+      summary: Update an MCP server
+      description: 'Patches the tool allowlist, upstream, PII inspection, auth or status. The
+
+        same destination and credential rules as create apply: a private
+
+        `upstream_url` or a literal `auth.headers` value is refused with 422.
+
+
+        `status` accepts `active` or `paused` — use `DELETE` to archive.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAiGatewayMcpServerRequest'
+            example:
+              allowed_tools:
+              - get_weather
+              status: paused
+      responses:
+        '200':
+          description: The updated MCP server.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayMcpServer'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/McpUnprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteAiGatewayMcpServer
+      summary: Archive an MCP server
+      description: Archives (soft-deletes) the server. The data plane stops serving its slug.
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The archived server id and status.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        example: archived
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/mcp-servers/{id}/grants:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The MCP server UUID.
+    get:
+      operationId: listAiGatewayMcpGrants
+      summary: List the delegated-OAuth connections on an MCP server
+      description: 'A connection is one person''s consent to let KnoxCall act as them against
+
+        this server''s upstream. KnoxCall holds their refresh token
+
+        envelope-encrypted under your tenant key and mints a short-lived access
+
+        token per call.
+
+
+        **No response here carries a token** — not redacted, not truncated,
+
+        absent. `has_refresh_token` is the only thing said about them.
+
+
+        **Creating a connection is not an API operation.** Consent has to be
+
+        given by the person whose credential it is, so the flow starts from a
+
+        signed-in KnoxCall session in the admin console. An API key is not a
+
+        person: an endpoint that started a flow "for alice@acme" would let
+
+        whoever holds the key finish it with their own upstream account, and the
+
+        connection would hold the key holder''s credential under Alice''s name.'
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of connections.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGatewayMcpGrant'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: revokeAllAiGatewayMcpGrants
+      summary: Revoke every delegated-OAuth connection on an MCP server
+      description: 'The offboarding-in-one-call shape. Each connection''s stored tokens are
+
+        destroyed, not flagged: the table refuses a revoked row that still holds
+
+        ciphertext. Anyone whose connection is revoked must consent again before
+
+        their next tool call on this server succeeds.'
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: How many connections were revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      revoked:
+                        type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/mcp-servers/{id}/grants/{grantId}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The MCP server UUID.
+    - name: grantId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The connection UUID.
+    delete:
+      operationId: revokeAiGatewayMcpGrant
+      summary: Revoke one person's delegated-OAuth connection
+      description: 'The stored refresh and access tokens are destroyed. Revoking here does
+
+        not revoke KnoxCall''s authorization at the upstream — do that in the
+
+        upstream''s own account settings if you need it gone there too.'
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The revoked connection id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        enum:
+                        - revoked
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/mcp-servers/{id}/tools:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The MCP server UUID.
+    get:
+      operationId: listAiGatewayMcpTools
+      summary: List an MCP server's tool rows
+      description: 'Tool rows are metadata. What a client can actually call is the
+
+        intersection of the server''s `allowed_tools`, the upstream''s real tool
+
+        list, and the presented token''s own tool scope.'
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of tool rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGatewayMcpTool'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: upsertAiGatewayMcpTool
+      summary: Upsert an MCP tool row
+      description: Inserts or updates a tool row by `tool_name`.
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertAiGatewayMcpToolRequest'
+            example:
+              tool_name: get_weather
+              description: Current weather for a city
+              enabled: true
+      responses:
+        '200':
+          description: The upserted tool row.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayMcpTool'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/mcp-servers/{id}/tools/{toolId}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The MCP server UUID.
+    - name: toolId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The tool row UUID.
+    patch:
+      operationId: updateAiGatewayMcpTool
+      summary: Enable, disable or re-describe a tool row
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type:
+                  - string
+                  - 'null'
+                input_schema:
+                  type: object
+                  additionalProperties: true
+                enabled:
+                  type: boolean
+            example:
+              enabled: false
+      responses:
+        '200':
+          description: The updated tool row.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayMcpTool'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/McpUnprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteAiGatewayMcpTool
+      summary: Delete a tool row
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The deleted tool id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      deleted:
+                        type: boolean
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/usage/export:
+    get:
+      operationId: exportAiGatewayUsage
+      summary: Export AI gateway usage (FinOps)
+      description: 'FinOps showback/chargeback export: aggregated spend grouped by a
+
+        dimension over a period. With `format=csv` the endpoint streams a
+
+        `text/csv` attachment; otherwise it returns the standard `{data, meta}`
+
+        JSON envelope.'
+      tags:
+      - AI Gateway
+      parameters:
+      - name: group_by
+        in: query
+        schema:
+          type: string
+          default: model
+        description: 'Grouping dimension: `user`, `team`, `agent`, `model`, `provider`, or `tag:<key>`.'
+        example: model
+      - name: period
+        in: query
+        schema:
+          type: string
+          enum:
+          - 7d
+          - 30d
+          - 90d
+          default: 30d
+        description: The rollup window. Defaults to 30 days.
+      - name: agent_id
+        in: query
+        schema:
+          type: string
+          format: uuid
+        description: Scope the export to a single agent.
+      - name: format
+        in: query
+        schema:
+          type: string
+          enum:
+          - json
+          - csv
+          default: json
+        description: Response format. `csv` streams a downloadable attachment.
+      responses:
+        '200':
+          description: The usage export (JSON envelope, or a CSV attachment when `format=csv`).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayUsageExport'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/usage:
+    get:
+      operationId: getAiGatewayUsage
+      summary: Get AI gateway usage
+      description: Returns cost and token totals broken down by model over the requested period, optionally scoped to a single agent.
+      tags:
+      - AI Gateway
+      parameters:
+      - name: period
+        in: query
+        schema:
+          type: string
+          enum:
+          - 7d
+          - 30d
+          - 90d
+          default: 30d
+        description: The rollup window. Defaults to 30 days.
+      - name: agent_id
+        in: query
+        schema:
+          type: string
+          format: uuid
+        description: Scope the rollup to a single agent.
+      responses:
+        '200':
+          description: The usage rollup.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayUsage'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /ai-gateway/firewall-policies:
+    get:
+      operationId: listAiGatewayFirewallPolicies
+      summary: List prompt-firewall policies
+      description: 'Firewall policies are tenant-scoped and shared across gateways: one policy can be
+
+        attached to any number of agents (`firewall_policy_id`) and MCP servers. Policies are
+
+        versioned by name — creating under an existing name returns a new version, and agents
+
+        stay bound to the version id they reference.'
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A page of firewall policies.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGatewayFirewallPolicy'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createAiGatewayFirewallPolicy
+      summary: Create a prompt-firewall policy
+      description: 'Creates a policy. Every `kind: regex` rule is compiled server-side with the same
+
+        linear-time engine the data plane runs, so a pattern that cannot execute is rejected
+
+        here (400 `unsafe_regex`) rather than stored and silently skipped at scan time.
+
+        Lookahead, lookbehind and backreferences are not supported.
+
+
+        `action` decides what a match does: `warn` (record, allow), `tag` (mark, allow) or
+
+        `block` (refuse the request with HTTP 400 `firewall_block`). An agent with no policy
+
+        attached still runs the built-in prompt-injection patterns but can never exceed `warn`.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiGatewayFirewallPolicyCreate'
+      responses:
+        '200':
+          description: The created policy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayFirewallPolicy'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /ai-gateway/firewall-policies/test:
+    post:
+      operationId: testAiGatewayFirewallRules
+      summary: Dry-run firewall rules against sample text
+      description: 'Runs the built-in prompt-injection patterns plus the supplied rules over `text` and
+
+        returns every match, without saving anything. Rules are compiled first, so this
+
+        endpoint refuses exactly what create/update refuse — a pattern that passes here is one
+
+        that will actually run in the data plane.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - text
+              properties:
+                text:
+                  type: string
+                  description: The prompt text to scan.
+                heuristics:
+                  type: array
+                  description: Candidate rules to test alongside the built-ins.
+                  items:
+                    $ref: '#/components/schemas/AiGatewayFirewallRule'
+      responses:
+        '200':
+          description: The scan result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayFirewallTestResult'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /ai-gateway/firewall-policies/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getAiGatewayFirewallPolicy
+      summary: Get a prompt-firewall policy
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The policy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayFirewallPolicy'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateAiGatewayFirewallPolicy
+      summary: Update a prompt-firewall policy
+      description: Updates the policy in place (the version is not bumped). Rules are re-validated.
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                heuristics:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AiGatewayFirewallRule'
+                canary_enabled:
+                  type: boolean
+                action:
+                  type: string
+                  enum:
+                  - block
+                  - warn
+                  - tag
+      responses:
+        '200':
+          description: The updated policy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayFirewallPolicy'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteAiGatewayFirewallPolicy
+      summary: Delete a prompt-firewall policy
+      description: 'Refused with 409 `policy_in_use` while any agent or MCP server is still attached — the
+
+        foreign keys are `ON DELETE SET NULL`, so an unchecked delete would silently detach
+
+        every consumer and downgrade an enforcing `block` policy to no policy at all.'
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      deleted:
+                        type: boolean
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /ai-gateway/pii-policies:
+    get:
+      operationId: listAiGatewayPiiPolicies
+      summary: List PII redaction policies
+      description: 'A PII policy is a named bundle of recognizer ids plus a `default_action`. Policies are
+
+        tenant-scoped and shared across gateways.
+
+
+        An EMPTY `recognizer_ids` does not mean "no recognizers" — it means "every enabled
+
+        recognizer this tenant owns".'
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A page of PII policies.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGatewayPiiPolicy'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createAiGatewayPiiPolicy
+      summary: Create a PII redaction policy
+      description: 'Every id in `recognizer_ids` must be a recognizer this tenant owns. A foreign or
+
+        unknown id is refused with 400 `recognizer_not_found` rather than stored: the column
+
+        has no foreign key, and the data-plane loader intersects with the recognizer row''s own
+
+        tenant, so a stored foreign id resolves to nothing — a policy that lists three
+
+        recognizers and runs zero, indistinguishable from working redaction until the PII
+
+        reaches the provider.
+
+
+        Custom PII policies are a Pro entitlement; a tenant who already owns one keeps
+
+        authoring (402 `plan_limit` otherwise).'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiGatewayPiiPolicyCreate'
+      responses:
+        '200':
+          description: The created policy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayPiiPolicy'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /ai-gateway/pii-policies/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getAiGatewayPiiPolicy
+      summary: Get a PII redaction policy
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The policy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayPiiPolicy'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateAiGatewayPiiPolicy
+      summary: Update a PII redaction policy
+      description: 'Updates in place (the version is not bumped). `recognizer_ids` is re-validated against
+
+        the tenant''s own recognizers. Passing `[]` resets the policy to "every enabled
+
+        recognizer" — that is a widening, not a clearing.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recognizer_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                default_action:
+                  type: string
+                  enum:
+                  - redact
+                  - tokenize
+                  - whitelist
+                  - warn
+                description:
+                  type: string
+      responses:
+        '200':
+          description: The updated policy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayPiiPolicy'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteAiGatewayPiiPolicy
+      summary: Delete a PII redaction policy
+      description: 'Refused with 409 `policy_in_use` while any agent still references the policy. The
+
+        foreign key is `ON DELETE SET NULL`, so an unchecked delete would detach every bound
+
+        agent and turn redaction OFF for each of them with no error and no signal.'
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      deleted:
+                        type: boolean
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /ai-gateway/pii-recognizers:
+    get:
+      operationId: listAiGatewayPiiRecognizers
+      summary: List custom PII recognizers
+      description: 'A recognizer is one tenant-defined detector — an internal employee-id shape, a
+
+        customer-reference format, anything the built-in entity tier does not know about.'
+      tags:
+      - AI Gateway
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A page of recognizers.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AiGatewayPiiRecognizer'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createAiGatewayPiiRecognizer
+      summary: Create a custom PII recognizer
+      description: 'A `kind: regex` pattern is compiled server-side with the same linear-time engine the
+
+        data plane runs, so lookahead, lookbehind and backreferences are refused here (400
+
+        `invalid_regex` / `unsafe_regex`) rather than stored and silently skipped at scan time —
+
+        a skipped detector is a fail-OPEN.
+
+
+        A `whitelist` recognizer is ordered ahead of every other detector, so a pattern that
+
+        matches arbitrary text is refused: one such row would suppress the whole built-in tier.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiGatewayPiiRecognizerCreate'
+      responses:
+        '200':
+          description: The created recognizer.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayPiiRecognizer'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /ai-gateway/pii-recognizers/test:
+    post:
+      operationId: testAiGatewayPiiRecognizer
+      summary: Dry-run a recognizer pattern against sample text
+      description: 'Compiles the candidate pattern and runs it over `text`, saving nothing. It uses the
+
+        SAME compiler and the SAME detector builder as the write path and the data plane, so a
+
+        pattern that passes here is one that will actually execute.
+
+
+        Do not preview locally: a client-side regex engine accepts lookahead, lookbehind and
+
+        backreferences that the server refuses, so a local preview shows matches for a
+
+        recognizer that can never run and then 400s on save.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - pattern
+              - text
+              properties:
+                pattern:
+                  type: string
+                  example: EMP-[0-9]{6}
+                text:
+                  type: string
+                  description: Sample text to scan.
+                kind:
+                  type: string
+                  enum:
+                  - regex
+                  - aho_corasick
+                  default: regex
+                action:
+                  type: string
+                  enum:
+                  - redact
+                  - tokenize
+                  - whitelist
+                  - warn
+                  default: redact
+                context_words:
+                  type: array
+                  items:
+                    type: string
+                name:
+                  type: string
+      responses:
+        '200':
+          description: The scan result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayPiiRecognizerTestResult'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /ai-gateway/pii-recognizers/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getAiGatewayPiiRecognizer
+      summary: Get a custom PII recognizer
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: The recognizer.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayPiiRecognizer'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateAiGatewayPiiRecognizer
+      summary: Update a custom PII recognizer
+      description: 'The MERGED state is validated, not the patch: `pattern`, `kind` and `action` together
+
+        decide whether a pattern is compiled and how the detector is ranked, so a patch
+
+        carrying only one of them is re-checked against the stored values.'
+      tags:
+      - AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiGatewayPiiRecognizerUpdate'
+      responses:
+        '200':
+          description: The updated recognizer.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AiGatewayPiiRecognizer'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteAiGatewayPiiRecognizer
+      summary: Delete a custom PII recognizer
+      description: 'Refused with 409 `recognizer_in_use` while any PII policy still lists it. Silently
+
+        removing the id would not shrink the policy: an EMPTY `recognizer_ids` means "every
+
+        enabled recognizer", so dropping the last id would WIDEN it. Remove the recognizer
+
+        from each policy first.'
+      tags:
+      - AI Gateway
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      deleted:
+                        type: boolean
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/oauth/token:
+    servers:
+    - url: https://{tenant}.knoxcall.com
+      description: Tenant data plane (Live). `tenant` is your tenant slug — the same subdomain your agent URLs and MCP connect URLs use.
+      variables:
+        tenant:
+          default: your-tenant
+    - url: https://sandbox-{tenant}.knoxcall.com
+      description: Tenant data plane (Test).
+      variables:
+        tenant:
+          default: your-tenant
+    post:
+      operationId: aiGatewayTokenExchange
+      summary: Exchange a CI OIDC token for an AI-gateway capability token
+      description: 'RFC 8693 token exchange. Trade a workload identity token your CI provider already
+
+        mints — GitHub Actions, GitLab CI, CircleCI, or any OIDC issuer you have registered
+
+        a binding for — for a short-lived KnoxCall capability token. **No KnoxCall
+
+        credential is stored in your CI system**: the subject token is the credential, and
+
+        it is verified against the issuer''s published JWKS.
+
+
+        **The host is the tenant data plane**, not `api.knoxcall.com` — the same subdomain
+
+        your agent URLs and MCP connect URLs use. `/v1/ai/`, `/v1/mcp/` and `/v1/oauth/`
+
+        are handed to the proxy router only on a tenant data-plane host. Sending this
+
+        request to `api.knoxcall.com` answers **401**, which reads like a rejected
+
+        `subject_token` but means the endpoint is not served there.
+
+
+        This endpoint is NOT the tenant OAuth 2.1 token endpoint. That one is
+
+        `POST https://api.knoxcall.com/oauth/token` on the root host, mints `kc_` management
+
+        tokens, and takes `client_credentials` / `authorization_code` / `refresh_token` /
+
+        `device_code`. This one lives under `/v1` on the tenant host, takes only
+
+        `urn:ietf:params:oauth:grant-type:token-exchange`, and mints an AI-gateway phantom
+
+        token for the data plane (`POST /v1/ai/...`, or `/v1/mcp/` when `resource` is
+
+        supplied). Sending a request for one to the other is an
+
+        `unsupported_grant_type`.
+
+
+        **Unauthenticated by design.** The subject token IS the credential. It must be a
+
+        JWS-compact `id_token` signed by a registered issuer, unexpired, and satisfy the
+
+        binding''s attribute conditions (repository, ref, workflow, …).
+
+
+        **`resource` narrows the token to `tool` kind.** Supplying an RFC 8707 `resource` —
+
+        the `resource` value from an MCP server''s create/get response — binds that MCP
+
+        resource into the capability HMAC, so the minted token is confined to exactly that
+
+        one server and is refused on the `/v1/ai` plane. Omit `resource` and you get an
+
+        `agent`-kind token instead, which is refused by `/v1/mcp`. A repeated or array
+
+        `resource` is `invalid_target`, never silently dropped: dropping it would mint an
+
+        UNCONFINED token while the client believes it is audience-restricted.
+
+
+        The token is returned once and is not retrievable. It appears in
+
+        `GET /v1/ai-gateway/gateways/{gatewayId}/tokens` (never its plaintext) and is
+
+        revoked with `DELETE /v1/ai-gateway/gateways/{gatewayId}/tokens/{tokenId}` — NOT
+
+        the per-agent revoke, because a federated token has no agent.
+
+
+        Accepts `application/x-www-form-urlencoded` (RFC 6749) or `application/json`.'
+      tags:
+      - AI Gateway
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AiGatewayTokenExchangeRequest'
+            examples:
+              githubActions:
+                summary: GitHub Actions OIDC → agent token
+                value:
+                  grant_type: urn:ietf:params:oauth:grant-type:token-exchange
+                  subject_token_type: urn:ietf:params:oauth:token-type:id_token
+                  audience: knoxcall:gateway
+                  subject_token: eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.eyJpc3MiOiJodHRwczovL3Rva2VuLmFjdGlvbnMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIn0.sig
+              mcpResourceBound:
+                summary: Same exchange, confined to one MCP server (RFC 8707)
+                value:
+                  grant_type: urn:ietf:params:oauth:grant-type:token-exchange
+                  subject_token_type: urn:ietf:params:oauth:token-type:id_token
+                  audience: knoxcall:gateway
+                  subject_token: eyJhbGciOiJSUzI1NiIsImtpZCI6IjEifQ.eyJpc3MiOiJodHRwczovL3Rva2VuLmFjdGlvbnMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIn0.sig
+                  resource: https://acme.knoxcall.com/v1/mcp/github-tools
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiGatewayTokenExchangeRequest'
+      responses:
+        '200':
+          description: A capability token, valid for `expires_in` seconds.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiGatewayTokenExchangeResponse'
+        '400':
+          description: 'RFC 6749 §5.2 error object — NOT the `{error: {...}}` envelope the rest of `/v1`
+
+            returns, because an OAuth client parses this shape. `unsupported_grant_type` (not
+
+            token-exchange), `invalid_request` (wrong `subject_token_type`, malformed or
+
+            missing `subject_token`, unsupported `alg`), `invalid_target` (wrong `audience`,
+
+            or a `resource` that is repeated / not an MCP URI on this origin),
+
+            `invalid_grant` (unregistered issuer, bad signature, expired or replayed
+
+            `subject_token`, unmet attribute conditions).
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+              example:
+                error: invalid_grant
+                error_description: No tenant bindings registered for issuer https://token.actions.githubusercontent.com
+        '500':
+          description: The tenant master key was unavailable, or verification failed unexpectedly.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+  /v1/ai/{agentSlug}/{upstreamPath}:
+    servers:
+    - url: https://{tenant}.knoxcall.com
+      description: Tenant data plane (Live). `tenant` is your tenant slug. The `agent_url` on every agent projection is this base plus `/v1/ai/{slug}` — use it rather than composing the host yourself, because it moves when the agent's slug changes.
+      variables:
+        tenant:
+          default: your-tenant
+    - url: https://sandbox-{tenant}.knoxcall.com
+      description: Tenant data plane (Test). A `kp_test_` token is refused on the Live host.
+      variables:
+        tenant:
+          default: your-tenant
+    parameters:
+    - name: agentSlug
+      in: path
+      required: true
+      description: The agent's `slug`. Selects the upstream route, the policies and the budget.
+      schema:
+        type: string
+        pattern: ^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$
+      example: production-claude
+    - name: upstreamPath
+      in: path
+      required: true
+      x-knoxcall-catch-all: true
+      description: 'The provider''s own path, forwarded verbatim — **including its slashes**, which
+
+        OpenAPI cannot express as a single path segment. `v1/messages` for Anthropic,
+
+        `v1/chat/completions` for OpenAI-shaped providers, `v1beta/models/{model}:generateContent`
+
+        for Gemini. Everything after `/v1/ai/{agentSlug}/` is the upstream path
+
+        (`src/ai-gateway/route-matcher.ts`), so the gateway adds no path of its own.
+
+        '
+      schema:
+        type: string
+      example: v1/messages
+    post:
+      operationId: aiGatewayExecute
+      summary: Call an AI provider through the gateway
+      description: 'Forwards the request to the agent''s configured upstream with the tenant''s provider
+
+        credential injected server-side, after applying every control the agent carries:
+
+        the prompt firewall, PII tokenization, the model allow/deny lists, the tool
+
+        allowlist, the daily/monthly budget and the token''s own signed caps. The response
+
+        is screened on the way back (PII redaction, canary detection, output-schema
+
+        validation) before it reaches you.
+
+
+        **The body and the response are the PROVIDER''s**, not KnoxCall''s — this is a
+
+        governed proxy, so an existing Anthropic or OpenAI SDK works unchanged once its
+
+        base URL is the agent''s `agent_url`. The only KnoxCall-shaped body you can receive
+
+        here is a refusal (see below).
+
+
+        **Streaming.** Ask the provider to stream — `"stream": true`, or Gemini''s
+
+        `:streamGenerateContent` endpoint — and, when the agent has `streaming_enabled`,
+
+        the response is Server-Sent Events with PII redaction applied mid-stream. An
+
+        `Accept: text/event-stream` header alone does not stream; the response is served
+
+        buffered. Streaming is refused with `400 streaming_redaction_unsupported` on an
+
+        endpoint whose event stream KnoxCall cannot redact (for example the OpenAI
+
+        Responses API), and with `400 streaming_disabled` when the agent does not stream. A stream that fails after its first frame ends with a
+
+        terminal `event: error` frame whose `data` is the same error object documented
+
+        below — the status line is already committed by then, so the frame is the only
+
+        place the reason can go.
+
+
+        **Every response carries `X-Request-Id`.** Quote it in support requests; it is the
+
+        key into the audit trail for that exact call. Refusals additionally write one
+
+        `ai_gateway.request_denied` audit row.'
+      tags:
+      - AI Gateway
+      security:
+      - PhantomToken: []
+      requestBody:
+        required: true
+        description: The upstream provider's own request body, forwarded after screening.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+            examples:
+              anthropicMessages:
+                summary: Anthropic Messages API through the gateway
+                value:
+                  model: claude-sonnet-4-6
+                  max_tokens: 1024
+                  messages:
+                  - role: user
+                    content: Summarise this ticket.
+              openAiChat:
+                summary: OpenAI-shaped chat completion, streamed
+                value:
+                  model: gpt-4o
+                  stream: true
+                  messages:
+                  - role: user
+                    content: Summarise this ticket.
+      responses:
+        '200':
+          description: 'The provider''s own response, passed through after response-side screening.
+
+            `text/event-stream` when the call was streamed.
+
+            '
+          headers:
+            X-Request-Id:
+              description: Correlation id for this call. Also on every error.
+              schema:
+                type: string
+                format: uuid
+            X-Knox-AI-Budget-Pct:
+              description: Percentage of the tightest active spend cap consumed.
+              schema:
+                type: string
+            X-Knox-AI-Budget-Warning:
+              description: Present when a `warn` budget is over its cap and the call was served anyway.
+              schema:
+                type: string
+            X-Knox-AI-Budget-Unmetered:
+              description: '`1` when the spend counter was unusable and the call was served without being metered.'
+              schema:
+                type: string
+            X-Knox-AI-Budget-Fallback:
+              description: The cheaper agent's slug when a `fallback` budget re-routed this call, or `unavailable` when it was configured and could not be honoured.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+            text/event-stream:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '401':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '403':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '404':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '422':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '429':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '500':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '502':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '503':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+    get:
+      operationId: aiGatewayExecuteGet
+      summary: Read from an AI provider through the gateway
+      description: 'The same governed forward for the provider''s read endpoints — polling a batch,
+
+        fetching its results, listing models. Identical credential, identical error
+
+        envelope; only the method differs. A batch is never streamed, whatever `Accept`
+
+        says, because settling it is what records the usage.'
+      tags:
+      - AI Gateway
+      security:
+      - PhantomToken: []
+      responses:
+        '200':
+          description: The provider's own response, passed through after response-side screening.
+          headers:
+            X-Request-Id:
+              description: Correlation id for this call. Also on every error.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '401':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '403':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '404':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '422':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '429':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '500':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '502':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+        '503':
+          $ref: '#/components/responses/AiGatewayDataPlaneError'
+components:
+  schemas:
+    MintAiGatewayTokenRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: A human-readable label for the token.
+        kind:
+          type: string
+          enum:
+          - agent
+          - read
+          - tool
+          - oneshot
+          default: agent
+        dpop_required:
+          type: boolean
+          default: false
+          description: Bind the token to a DPoP key. Requires `dpop_jkt`.
+        dpop_jkt:
+          type: string
+          description: base64url SHA-256 thumbprint of your DPoP public key. Required when `dpop_required` is true.
+        expires_in_seconds:
+          type: integer
+          minimum: 60
+          maximum: 7776000
+          description: Token lifetime, clamped to [60s, 90d]. Omit for the 30 days default; a non-expiring token cannot be minted.
+    CreateAiGatewayMcpServerRequest:
+      type: object
+      required:
+      - name
+      - slug
+      - upstream_url
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+          description: Lowercase letters, numbers and hyphens.
+        description:
+          type:
+          - string
+          - 'null'
+        server_type:
+          type: string
+          enum:
+          - upstream
+          default: upstream
+          description: '`collection` is rejected with 422 `unsupported_server_type` — the forwarder does not serve it yet.'
+        transport:
+          type: string
+          enum:
+          - streamable_http
+          default: streamable_http
+          description: Only `streamable_http` is accepted. The gateway's connect path always builds a Streamable HTTP transport, so accepting `sse` would store a silent protocol mismatch.
+        upstream_url:
+          type: string
+          format: uri
+          description: A public `https://` MCP endpoint. Private, loopback, link-local and cloud-metadata destinations are refused.
+        allowed_tools:
+          type: array
+          items:
+            type: string
+          description: Empty (the default) means the server advertises nothing.
+        pii_inspection:
+          type: boolean
+          default: true
+        auth:
+          $ref: '#/components/schemas/AiGatewayMcpAuth'
+        pii_redact_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: A PII policy THIS tenant owns (AIGW-151). A policy id you do not own is refused 422 — the FK is id-only, so the ownership check is the control.
+        firewall_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        guardrail_webhook_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: https only; no embedded credentials; SSRF-checked at write time.
+        guardrail_webhook_secret_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        guardrail_webhook_mode:
+          type: string
+          enum:
+          - 'off'
+          - request
+          - response
+          - both
+        guardrail_webhook_timeout_ms:
+          type: integer
+          minimum: 100
+          maximum: 10000
+        guardrail_webhook_failure_action:
+          type: string
+          enum:
+          - fail_open
+          - fail_closed
+    AiGatewayPhantomToken:
+      type: object
+      description: A capability (phantom) token row. The plaintext is never returned here — only at mint time.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type:
+          - string
+          - 'null'
+        kind:
+          type: string
+          enum:
+          - agent
+          - read
+          - tool
+          - oneshot
+        prefix:
+          type: string
+          description: The non-secret token prefix, safe to display.
+        dpop_required:
+          type: boolean
+        scope_jsonb:
+          type: object
+          additionalProperties: true
+          description: The capability scope (providers/models) the token is bound to.
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        revoked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - kind
+      - prefix
+      - dpop_required
+      - created_at
+    AiGatewayPiiRecognizer:
+      type: object
+      description: One tenant-defined PII detector.
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+          - regex
+          - aho_corasick
+          - presidio_pattern
+          - presidio_ner
+          - presidio_custom
+          description: '`regex` and `aho_corasick` run in-process; the three `presidio_*` kinds are handed
+
+            to a Presidio sidecar.
+
+            '
+        pattern:
+          type: string
+        context_words:
+          type: array
+          description: Words that must appear nearby for a match to count.
+          items:
+            type: string
+        confidence:
+          type: number
+          format: float
+        action:
+          type: string
+          enum:
+          - redact
+          - tokenize
+          - whitelist
+          - warn
+        format:
+          type:
+          - string
+          - 'null'
+          description: Token format for `tokenize`; null otherwise.
+        enabled:
+          type: boolean
+          description: False mutes the recognizer without losing its definition.
+        created_at:
+          type: string
+          format: date-time
+    UpdateAiGatewayRequest:
+      type: object
+      description: Only the provided fields are changed.
+      properties:
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+        budget_overage_action:
+          type: string
+          enum:
+          - block
+          - warn
+          description: 'What happens when the gateway''s cap is spent (AIGW-150). Defaults to `block`. No `fallback` — that action swaps an agent''s route and model, which a gateway does not have.
+
+            '
+        geo_velocity_action:
+          type: string
+          enum:
+          - 'off'
+          - warn
+          - block
+        model_aliases:
+          type: object
+          description: 'Model aliases shared by every agent under this gateway (AIGW-42): `{alias: real_model_id}`. Name `fast` once here rather than in every call site of every service.
+
+
+            Resolved BEFORE the per-agent model policy, so an alias target is still subject to that agent''s allow/deny list and `model_rewrite` — an alias is a naming convenience, never a way around a control. A chain resolves with a hop limit; a cycle degrades to the original model rather than looping. Max 100 entries.
+
+            '
+          additionalProperties:
+            type: string
+            maxLength: 200
+    AiGatewayRoutingPolicy:
+      type: object
+      description: 'How this agent retries and spreads load (AIGW-42). An empty object — the default for every agent — means one attempt per route and fail-over to `fallback_route_ids` on 5xx only, which is the behaviour the gateway has always had.
+
+
+        Every field is clamped server-side. A request parked waiting to retry occupies an API worker, so `max_attempts` caps at 5, any single delay at 30s, a honoured `Retry-After` at 60s, and the total sleep for one request at 60s regardless of how the fields combine.
+
+        '
+      additionalProperties: false
+      properties:
+        retry_on:
+          type: array
+          description: 'Which outcomes are retried on the SAME route before failing over. `429` also promotes a rate-limit response to a fail-over trigger; without it a 429 is returned to you immediately, unchanged.
+
+            '
+          items:
+            type: string
+            enum:
+            - '429'
+            - 5xx
+            - timeout
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 'Attempts per candidate route, including the first. Forced to 1 when `retry_on` is empty, so a stored policy never claims a retry that cannot happen.
+
+            '
+        backoff_ms:
+          type: integer
+          minimum: 0
+          maximum: 30000
+          description: Delay before the second attempt.
+        backoff_multiplier:
+          type: number
+          minimum: 1
+          maximum: 10
+        max_backoff_ms:
+          type: integer
+          minimum: 0
+          maximum: 30000
+        respect_retry_after:
+          type: boolean
+          description: 'Default true. An upstream `Retry-After` is honoured when it asks for LONGER than the computed backoff — it can extend a wait, never shorten one.
+
+            '
+        max_retry_after_ms:
+          type: integer
+          minimum: 0
+          maximum: 60000
+          description: Ceiling on a honoured `Retry-After`.
+        jitter:
+          type: boolean
+          description: 'Default true. Spreads each delay across 50–100% of its computed value so a fleet does not retry in lockstep.
+
+            '
+        route_weights:
+          type: object
+          description: '`{route_id: weight}`. When present, the route that serves a request is chosen in proportion to its weight across the primary and every fallback, and the remainder stay in weighted order for fail-over. A route not named here keeps weight 1; a route weighted 0 is drained and receives no traffic at all, including fail-over traffic. The token''s own capability scope is enforced on every candidate, so a weight can never reach a route the token was not granted.
+
+            '
+          additionalProperties:
+            type: integer
+            minimum: 0
+            maximum: 1000
+    AiGatewayPhantomTokenCreated:
+      type: object
+      description: The mint result. `token` is the plaintext capability token and is shown exactly once.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type:
+          - string
+          - 'null'
+        kind:
+          type: string
+          enum:
+          - agent
+          - read
+          - tool
+          - oneshot
+        prefix:
+          type: string
+        token:
+          type: string
+          description: The plaintext capability token — store it now; it is never shown again.
+        dpop_required:
+          type: boolean
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      required:
+      - id
+      - kind
+      - prefix
+      - token
+    AiGatewayUsageExportRow:
+      type: object
+      properties:
+        group:
+          type:
+          - string
+          - 'null'
+          description: The dimension value for this row (e.g. a model id, provider name, or tag value).
+        requests:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        cost_usd:
+          type: number
+        unpriced_requests:
+          type: integer
+    AiGatewayUsageByModel:
+      type: object
+      properties:
+        provider:
+          type: string
+        model:
+          type: string
+        requests:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        cost_usd:
+          type: number
+        unpriced_requests:
+          type: integer
+          description: Requests with no price data (excluded from cost).
+    AiGatewayFirewallTestResult:
+      type: object
+      properties:
+        matched:
+          type: boolean
+        matches:
+          type: array
+          items:
+            type: object
+            properties:
+              rule:
+                type: string
+              span:
+                type: array
+                items:
+                  type: integer
+                minItems: 2
+                maxItems: 2
+              matched:
+                type: string
+        skipped:
+          type: array
+          description: Rules that could not be compiled and so did not run. Always empty for a validated request.
+          items:
+            type: object
+            properties:
+              rule:
+                type: string
+              reason:
+                type: string
+    AiGatewayTokenExchangeRequest:
+      type: object
+      description: 'RFC 8693 token-exchange request for `POST /v1/oauth/token`. Sent as
+
+        `application/x-www-form-urlencoded` (RFC 6749) or `application/json`.
+
+        '
+      required:
+      - grant_type
+      - subject_token
+      - subject_token_type
+      properties:
+        grant_type:
+          type: string
+          enum:
+          - urn:ietf:params:oauth:grant-type:token-exchange
+          description: Only token-exchange. Anything else is `unsupported_grant_type`.
+        subject_token:
+          type: string
+          description: 'The workload''s OIDC id_token, JWS-compact. Its `iss` must match a registered
+
+            binding, its signature must verify against that issuer''s published JWKS, and it
+
+            must be unexpired. Where single-use enforcement is on, a second exchange of the
+
+            same token is `invalid_grant`.
+
+            '
+        subject_token_type:
+          type: string
+          enum:
+          - urn:ietf:params:oauth:token-type:id_token
+          description: Only `id_token`. Anything else is `invalid_request`.
+        audience:
+          type: string
+          default: knoxcall:gateway
+          description: Defaults to `knoxcall:gateway`. Any other value is `invalid_target`.
+        resource:
+          type: string
+          format: uri
+          description: 'RFC 8707 resource indicator — the `resource` value from an MCP server''s
+
+            create/get response. Supplying it narrows the minted token to `tool` kind and
+
+            binds that resource into the capability HMAC, so the token reaches exactly that
+
+            one MCP server and nothing else. Omit it for an `agent`-kind token for the
+
+            `/v1/ai` plane. A repeated or non-string value is `invalid_target` — it is never
+
+            silently dropped, because dropping it would mint an UNCONFINED token while the
+
+            client believes it is audience-restricted.
+
+            '
+    AiGatewayMcpTool:
+      type: object
+      description: A tool metadata row. It does not widen what the server advertises — that is the intersection of `allowed_tools`, the upstream's real tools and the token's tool scope.
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        mcp_server_id:
+          type: string
+          format: uuid
+        tool_name:
+          type: string
+        route_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        description:
+          type:
+          - string
+          - 'null'
+        input_schema:
+          type: object
+          additionalProperties: true
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AiGatewayMcpAuth:
+      type: object
+      description: 'Upstream auth for an MCP server. A secret reference is the only supported path: every header value must contain a `{{secret_id:<uuid>}}` (or legacy `{{secret:<name>}}`) placeholder. A literal is refused with 422 `plaintext_auth` — it would sit in cleartext in the control plane.'
+      properties:
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            Authorization: Bearer {{secret_id:11111111-2222-3333-4444-555555555555}}
+        environment_name:
+          type: string
+          default: production
+          description: Which per-environment secret value to resolve.
+      additionalProperties: false
+    UpdateAiGatewayAgentRequest:
+      type: object
+      description: Only the provided fields are changed. Every writable column on an agent appears here — this schema is what the typed SDKs are generated and reviewed against, so a field missing from it becomes a field missing from them (AIGW-161).
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+          description: 'RENAMES the agent, which MOVES its data-plane URL: `agent_url` is computed from the slug rather than stored, so every caller pointed at the old URL gets a 404 from the moment this returns. The new URL is on this response — read it rather than reconstructing it.'
+        description:
+          type:
+          - string
+          - 'null'
+        primary_route_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        fallback_route_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        default_model:
+          type:
+          - string
+          - 'null'
+        model_allowlist:
+          type: array
+          items:
+            type: string
+        model_denylist:
+          type: array
+          items:
+            type: string
+        model_rewrite:
+          type: object
+          additionalProperties:
+            type: string
+          maxProperties: 100
+          description: Map of requested model → substituted model. Values must be STRINGS (the server validates with a string map) and at most 100 entries.
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+        budget_per_call_max_tokens:
+          type:
+          - integer
+          - 'null'
+        budget_overage_action:
+          type: string
+          enum:
+          - block
+          - warn
+          - fallback
+          description: What happens once a budget is exhausted. `fallback` needs `fallback_agent_id`; without one it behaves as `block`.
+        fallback_agent_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        streaming_enabled:
+          type: boolean
+        firewall_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        pii_redact_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        pii_detokenize_response:
+          type: boolean
+          deprecated: true
+          description: AIGW-100 legacy alias for `pii_response_mode` (`true` -> `detokenize`, `false` -> `redact`). Still accepted; sending both with contradictory values is a 400.
+        pii_request_mode:
+          type: string
+          enum:
+          - 'off'
+          - tokenize
+          description: What happens to the PROMPT before it leaves KnoxCall. Default `tokenize`. Set `off` only for an agent whose payload must reach the provider byte-for-byte (structured tool-use JSON, for example) — it means prompts are forwarded unscanned.
+        pii_response_mode:
+          type: string
+          enum:
+          - redact
+          - detokenize
+          description: What happens to the provider's answer. Default `detokenize`.
+        pii_streaming_holdback_chars:
+          type: integer
+          description: How many characters of a STREAMED answer are held back while a detector decides. Larger catches an entity split across more chunks; smaller is lower latency.
+        pii_streaming_mode:
+          type: string
+          enum:
+          - holdback
+          - buffer
+          - monitor
+          description: How a streamed answer is rewritten. `holdback` releases text behind a sliding window; `buffer` withholds the whole answer until it is complete; `monitor` REPORTS detections without rewriting, so the raw value reaches the client — an observability mode, not a redaction one.
+        tags:
+          type: object
+          additionalProperties: true
+          description: FinOps attribution labels (cost_center/team/project/…) echoed onto this agent's usage rows.
+        cache_mode:
+          type: string
+          enum:
+          - 'off'
+          - exact
+          - semantic
+          description: '`semantic` additionally needs `cache_embedding_model`; without one the cache reports itself degraded and serves nothing.'
+        cache_ttl_seconds:
+          type: integer
+        cache_similarity_threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 'Cosine floor for a semantic cache hit, 0–1. Lower means more hits, and more wrong ones. NOT nullable: the column is `NOT NULL` and the validator is non-nullable, so an explicit `null` is a 400.'
+        cache_embedding_model:
+          type:
+          - string
+          - 'null'
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        output_schema:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+          description: JSON Schema the answer is validated against.
+        output_validation_action:
+          type: string
+          enum:
+          - block
+          - retry
+          - warn
+        data_residency_region:
+          type:
+          - string
+          - 'null'
+        cmek_key_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        routing_policy:
+          $ref: '#/components/schemas/AiGatewayRoutingPolicy'
+        guardrail_webhook_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: 'HTTPS endpoint your own scanner listens on (AIGW-45). Every prompt — and, in `response`/`both` mode, every response — is POSTed to it for a verdict before it moves.
+
+
+            What it receives is the REDACTED, post-tokenization body: the same bytes the provider would get, never a resolved provider credential and never your KnoxCall token. Shipping raw PHI to a third party to ask whether it contains PHI would be the leak the gateway exists to prevent.
+
+
+            The destination is resolved and refused at write time AND on every call — a private, loopback, link-local or cloud-metadata address is a 400, because DNS is not a promise.
+
+            '
+        guardrail_webhook_secret_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'Secret holding the HMAC-SHA256 key deliveries are signed with. The signature covers `<timestamp>.<body>` and travels in `x-knox-guardrail-signature` with the timestamp in `x-knox-guardrail-timestamp`, so a captured delivery is not replayable. Omit to send unsigned — the receiver then cannot prove the call came from KnoxCall.
+
+            '
+        guardrail_webhook_mode:
+          type: string
+          enum:
+          - 'off'
+          - request
+          - response
+          - both
+          description: 'Which directions are inspected. `response` and `both` evaluate the complete buffered response before it is sent, so an agent in those modes REFUSES a streaming request (400 `guardrail_streaming_unsupported`) rather than serving one past a control that could not run on it.
+
+            '
+        guardrail_webhook_timeout_ms:
+          type: integer
+          minimum: 100
+          maximum: 10000
+          description: 'How long to wait for a verdict. Clamped, because a request waiting on your scanner is holding one of the gateway''s API workers.
+
+            '
+        guardrail_webhook_failure_action:
+          type: string
+          enum:
+          - fail_open
+          - fail_closed
+          description: 'What happens when the hook does not answer. Applies identically to EVERY non-answer — timeout, refused connection, refused destination, non-2xx, unparseable body, an `action` verb we do not recognise. Defaults to `fail_open`, which is the posture an agent already has with no hook at all.
+
+
+            A hook responds `200` with `{"action":"allow"|"block"|"flag","reason":"…"}`. `block` refuses the request with 400 `guardrail_block` and your `reason` in the message; `flag` serves it and records the outcome.
+
+            '
+    AiGatewayFirewallRule:
+      type: object
+      description: One heuristic rule inside a firewall policy.
+      required:
+      - name
+      - kind
+      - pattern
+      properties:
+        name:
+          type: string
+          description: 2-64 chars (letters, digits, space, underscore, hyphen). Appears in firewall events.
+          example: no_competitor_mentions
+        kind:
+          type: string
+          enum:
+          - regex
+          - keyword
+          description: '`regex` compiles the pattern with a linear-time engine (no lookahead, lookbehind or
+
+            backreferences). `keyword` is a case-insensitive substring match.
+
+            '
+        pattern:
+          type: string
+          maxLength: 1000
+          example: CompetitorAI
+        flags:
+          type: string
+          description: Regex flags. Only i, m, s, g and y are accepted. Defaults to i. Ignored for keyword rules.
+          example: i
+    AiGatewayMcpServer:
+      type: object
+      description: 'An MCP server KnoxCall proxies and governs. `connect_url` and `resource`
+
+        are deliberately different values — see their descriptions.
+
+        '
+      properties:
+        id:
+          type: string
+          format: uuid
+        gateway_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        name:
+          type: string
+        slug:
+          type:
+          - string
+          - 'null'
+          description: Lowercase machine handle; the last segment of `connect_url`.
+        description:
+          type:
+          - string
+          - 'null'
+        server_type:
+          type: string
+          enum:
+          - upstream
+          - collection
+          description: Only `upstream` can be created today; `collection` is not served yet.
+        transport:
+          type:
+          - string
+          - 'null'
+          enum:
+          - streamable_http
+          - sse
+          - null
+        upstream_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: The upstream MCP endpoint. Always a public `https://` address.
+        allowed_tools:
+          type: array
+          items:
+            type: string
+          description: Tool names this server may advertise. EMPTY MEANS IT ADVERTISES NOTHING — a client sees an empty tool list.
+        pii_inspection:
+          type: boolean
+          description: Inspect tool arguments and results for PII.
+        pii_redact_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: The tenant PII policy whose recognizers apply to this server's tool arguments and results (AIGW-151). Null means every enabled recognizer this tenant owns, on top of the shipped built-ins. Before AIGW-151 the MCP plane used one built-in-only detector stack built at boot, so no tenant recognizer ever applied to tool traffic.
+        firewall_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Prompt-injection firewall policy applied to this server's tool traffic.
+        guardrail_webhook_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: The tenant's own external scanner (AIGW-150). https only, no embedded credentials, and the destination is SSRF-checked at write time and again on every call. Unlike `/v1/ai` there is no streaming carve-out — the MCP transport materialises every JSON-RPC message, so both directions are always inspectable.
+        guardrail_webhook_secret_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: KnoxCall secret holding the HMAC key deliveries are signed with.
+        guardrail_webhook_mode:
+          type: string
+          enum:
+          - 'off'
+          - request
+          - response
+          - both
+          description: Which directions are offered to the scanner. `request` sees the tool ARGUMENTS after PII redaction and before they leave; `response` sees the tool RESULT after redaction and before it is returned. A `block` verdict refuses the call.
+        guardrail_webhook_timeout_ms:
+          type: integer
+          minimum: 100
+          maximum: 10000
+        guardrail_webhook_failure_action:
+          type: string
+          enum:
+          - fail_open
+          - fail_closed
+          description: What happens when the scanner cannot be reached or does not answer.
+        auth:
+          type: object
+          additionalProperties: true
+          description: Upstream auth. Only `{ headers, environment_name }` is supported, and every header value must reference a KnoxCall secret, so this object never contains a credential.
+        sandbox:
+          type: boolean
+          description: 'Which Live/Test space this server lives in (AIGW-152). READ-ONLY: it is taken from the mode of the request that created the server (a test API key on the sandbox host makes a Test server) and cannot be set or changed through the API, for the same reason the mode is never a request field anywhere else — a body that could choose it would let a Test caller create a Live server whose `auth` reference resolves a LIVE secret. Reads and writes are confined to the calling key''s own space, so a Live key does not see a Test server at all. On the data plane the confinement is the capability token''s: a `kp_test_` token against a Live server is a 404. The same slug may exist in both spaces, so an MCP client''s configuration does not change between them.'
+        status:
+          type: string
+          enum:
+          - active
+          - paused
+          - archived
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        connect_url:
+          type: string
+          format: uri
+          description: Where an MCP client points. Served on the tenant data-plane host.
+        resource:
+          type: string
+          format: uri
+          description: The RFC 8707 `resource` a token for this server must be bound to. A token bound to a different resource is refused at this server.
+    AiGatewayUsage:
+      type: object
+      description: Cost and token rollup by model over the requested period.
+      properties:
+        period_days:
+          type: integer
+        by_model:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiGatewayUsageByModel'
+        totals:
+          $ref: '#/components/schemas/AiGatewayUsageTotals'
+      required:
+      - period_days
+      - by_model
+      - totals
+    AiGatewayDataPlaneError:
+      type: object
+      description: 'AIGW-163 — the ONE error envelope of the AI data plane, served by `/v1/ai/*` and by
+
+        every layer in front of it (authentication, the audience guard, the rate limiter,
+
+        the boot sentinel).
+
+
+        It is NOT the `{error: {type, message, request_id}}` envelope the rest of `/v1`
+
+        uses. That one belongs to the Management API, which is a different plane with a
+
+        different credential; this one is what a governed proxy can answer beside a
+
+        provider''s own body. `/v1/mcp` answers JSON-RPC 2.0 and `/v1/oauth/token` answers
+
+        RFC 6749 §5.2, both by their protocols'' rules.
+
+
+        **`error` and `code` always carry the same value.** That is deliberate: three
+
+        incompatible shapes existed here before AIGW-163 and they disagreed about which of
+
+        the two was machine-readable, so both are now, and a client that reads either keeps
+
+        working. Branch on the identifier, never on `error_description` — descriptions are
+
+        rewritten whenever a clearer wording is found.
+
+
+        Some refusals add extra keys alongside the three (`utilization_pct`, `model`,
+
+        `request_id`). Ignore keys you do not recognise; new ones are additive.
+
+        '
+      required:
+      - error
+      - error_description
+      - code
+      additionalProperties: true
+      properties:
+        error:
+          type: string
+          description: Machine-readable identifier. Identical to `code`.
+          example: budget_exceeded
+        error_description:
+          type: string
+          description: Human-readable sentence. Never parse it.
+          example: 'Daily budget exceeded: $50.0031 ≥ $50'
+        code:
+          type: string
+          description: Machine-readable identifier. Identical to `error`.
+          example: budget_exceeded
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
+    AiGatewayPiiRecognizerTestResult:
+      type: object
+      properties:
+        matched:
+          type: boolean
+        matches:
+          type: array
+          items:
+            type: object
+            properties:
+              span:
+                type: array
+                items:
+                  type: integer
+                minItems: 2
+                maxItems: 2
+              matched:
+                type: string
+                description: The exact substring the pattern matched.
+              replacement:
+                type: string
+                description: What the data plane would substitute for it.
+              entity_type:
+                type: string
+    AiGatewayUsageExport:
+      type: object
+      description: FinOps showback/chargeback rollup, aggregated by the requested dimension.
+      properties:
+        group_by:
+          type: string
+          description: 'The grouping dimension: `user`, `team`, `agent`, `model`, `provider`, or `tag:<key>`.'
+        period_days:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiGatewayUsageExportRow'
+      required:
+      - group_by
+      - period_days
+      - rows
+    AiGatewayPiiRecognizerUpdate:
+      type: object
+      description: 'Partial. The server validates the MERGED state, not the patch — `pattern`, `kind` and
+
+        `action` together decide whether a pattern is compiled and how the detector is ranked.
+
+        '
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+          - regex
+          - aho_corasick
+          - presidio_pattern
+          - presidio_ner
+          - presidio_custom
+        pattern:
+          type: string
+        context_words:
+          type: array
+          items:
+            type: string
+        confidence:
+          type: number
+          format: float
+        action:
+          type: string
+          enum:
+          - redact
+          - tokenize
+          - whitelist
+          - warn
+        format:
+          type:
+          - string
+          - 'null'
+        enabled:
+          type: boolean
+    AiGatewayAgent:
+      type: object
+      description: An agent under a gateway — the addressable unit an AI SDK points at.
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        gateway_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        primary_route_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        fallback_route_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        model_allowlist:
+          type: array
+          items:
+            type: string
+        model_denylist:
+          type: array
+          items:
+            type: string
+        default_model:
+          type:
+          - string
+          - 'null'
+        model_rewrite:
+          type: object
+          additionalProperties:
+            type: string
+          maxProperties: 100
+          description: Map of requested model → substituted model. Values must be STRINGS (the server validates with a string map) and at most 100 entries.
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+        budget_per_call_max_tokens:
+          type:
+          - integer
+          - 'null'
+        budget_overage_action:
+          type: string
+        fallback_agent_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        pii_redact_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        pii_detokenize_response:
+          type: boolean
+          readOnly: true
+          description: AIGW-100 legacy alias. Read-only mirror of `pii_response_mode == "detokenize"`; the column is GENERATED in the database so the two can never disagree. Still ACCEPTED on create and update, where it is folded onto `pii_response_mode`.
+        pii_request_mode:
+          type: string
+          enum:
+          - 'off'
+          - tokenize
+          description: 'What happens to the PROMPT before it leaves KnoxCall. `tokenize` (default) replaces detected entities with conversation-scoped, format-preserving tokens before the provider sees them; `off` forwards the prompt exactly as sent. Independent of `pii_response_mode` — before AIGW-100 request tokenization was gated on the response toggle, so an agent with a PII policy and `pii_detokenize_response: false` sent prompts verbatim.'
+        pii_response_mode:
+          type: string
+          enum:
+          - redact
+          - detokenize
+          description: What happens to the provider's answer. `redact` runs the detector stack (fresh PII in the completion, canary tokens) and leaves `KC_*` tokens as tokens; `detokenize` (default) also swaps them back to this conversation's originals. There is no `off` — the detector stack runs on every 2xx.
+        pii_streaming_holdback_chars:
+          type: integer
+        pii_streaming_mode:
+          type: string
+        cache_mode:
+          type: string
+        cache_ttl_seconds:
+          type: integer
+        cache_similarity_threshold:
+          type:
+          - number
+          - 'null'
+        cache_embedding_model:
+          type:
+          - string
+          - 'null'
+        streaming_enabled:
+          type: boolean
+        firewall_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        output_schema:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+        output_validation_action:
+          type: string
+        data_residency_region:
+          type:
+          - string
+          - 'null'
+          enum:
+          - us
+          - eu
+          - uk
+          - ca
+          - au
+          - jp
+          - in
+          - null
+          description: 'AIGW-53: pin this agent''s upstream egress to a data-residency region. When set, a request whose upstream endpoint KnoxCall cannot classify as serving that region is refused on the data plane with HTTP 403 `residency_violation` — including a fallback route, which is where an unpinned failover would otherwise leave the region. `null` (the default) applies no residency constraint. See https://docs.knoxcall.com/ai-gateway/data-residency for the endpoints KnoxCall classifies and for what this control does and does not guarantee.'
+        cmek_key_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'AIGW-53: the `tenant_master_keys` id this agent''s AI data (its PII token map) is encrypted under. Must be one of THIS tenant''s keys and must be customer-managed (`wrap_method = customer_kms`, i.e. BYOK configured) — a KnoxCall-wrapped key is refused, because a CMEK the platform can unwrap is not a CMEK. If the key is missing, retired, revoked, or your KMS refuses to unwrap it, the data-plane request is refused with HTTP 503 `cmek_unavailable` rather than written under a different key.'
+        status:
+          type: string
+          enum:
+          - active
+          - paused
+          - archived
+        paused_reason:
+          type:
+          - string
+          - 'null'
+        tags:
+          type: object
+          additionalProperties: true
+          description: FinOps attribution labels (cost_center/team/project/…) echoed onto this agent's usage rows.
+        provider:
+          type:
+          - string
+          - 'null'
+          description: 'The upstream shape this agent fronts — one of the values `CreateAiGatewayAgentRequest.provider` enumerates (the catalog has grown to fourteen; `ai_gateway_agents_provider_check` is the authority). Set once, at create time, and deliberately NOT patchable: changing it without re-pointing `primary_route_id` at a matching route would make the stored value a lie. `null` on an agent created before the field existed whose route shape the backfill did not recognise — render that as "custom", never as a guess.'
+        routing_policy:
+          allOf:
+          - $ref: '#/components/schemas/AiGatewayRoutingPolicy'
+          description: 'Returned on every agent read. `{}` — the default for every agent — means one attempt per route and fail-over to `fallback_route_ids` on 5xx only.
+
+            '
+        guardrail_webhook_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: 'The external scanner this agent POSTs to for a verdict, or null when it has none. See `CreateAiGatewayAgentRequest.guardrail_webhook_url` for what the hook receives and how the destination is refused.
+
+            '
+        guardrail_webhook_secret_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'Secret holding the HMAC-SHA256 key deliveries are signed with, or null when deliveries are sent unsigned.
+
+            '
+        guardrail_webhook_mode:
+          type: string
+          enum:
+          - 'off'
+          - request
+          - response
+          - both
+          description: 'Which directions are inspected. `off` when the agent has no hook — the server returns the string, never a boolean.
+
+            '
+        guardrail_webhook_timeout_ms:
+          type: integer
+          minimum: 100
+          maximum: 10000
+          description: How long the gateway waits for a verdict. Defaults to 2000.
+        guardrail_webhook_failure_action:
+          type: string
+          enum:
+          - fail_open
+          - fail_closed
+          description: 'What happens when the hook does not answer. Defaults to `fail_open`, the posture an agent already has with no hook at all.
+
+            '
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type:
+          - string
+          - 'null'
+        agent_url:
+          type: string
+          description: 'The data-plane base URL for this agent — `https://{tenant}.knoxcall.com/v1/ai/{slug}`.
+
+            Point an AI SDK''s `base_url` here and give it a capability token as the API key.
+
+
+            Present on EVERY agent projection: create, get, update and the list rows (AIGW-160
+
+            era it was create and get only, so a list row was shaped differently from the row
+
+            create returned). It is server-computed rather than stored, so it MOVES when `slug`
+
+            changes — which is why `PATCH` returns it too.
+
+
+            An EMPTY STRING when the tenant slug cannot be resolved. Treat empty as "not
+
+            available", never as a URL.
+
+            '
+      required:
+      - id
+      - gateway_id
+      - name
+      - slug
+      - status
+      - agent_url
+      - created_at
+      - updated_at
+    AiGatewayUsageTotals:
+      type: object
+      properties:
+        requests:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        cost_usd:
+          type: number
+        unpriced_requests:
+          type: integer
+    AiGatewayMcpGrant:
+      type: object
+      description: 'One person''s delegated-OAuth connection to an MCP server (AIGW-190).
+
+        Never carries the stored tokens.
+
+        '
+      properties:
+        id:
+          type: string
+          format: uuid
+        attributed_user_id:
+          type: string
+          format: uuid
+          description: The tenant directory row this connection belongs to.
+        external_id:
+          type: string
+          description: That person's identifier in your directory.
+        display_name:
+          type:
+          - string
+          - 'null'
+        scopes:
+          type: array
+          items:
+            type: string
+          description: The scopes the upstream actually granted.
+        status:
+          type: string
+          enum:
+          - active
+          - revoked
+        created_at:
+          type: string
+          format: date-time
+        last_refreshed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        has_refresh_token:
+          type: boolean
+          description: 'Whether KnoxCall holds a renewable credential for this person. False
+
+            means the connection cannot outlive its current access token and the
+
+            person should reconnect.
+
+            '
+    CreateAiGatewayRequest:
+      type: object
+      required:
+      - name
+      - slug
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+          description: Unique machine handle within the tenant.
+        description:
+          type:
+          - string
+          - 'null'
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+        budget_overage_action:
+          type: string
+          enum:
+          - block
+          - warn
+          description: 'What happens when the gateway''s cap is spent (AIGW-150). Defaults to `block`. No `fallback` — that action swaps an agent''s route and model, which a gateway does not have.
+
+            '
+    OAuthError:
+      type: object
+      description: OAuth 2.1 error response (RFC 6749 §5.2). The OAuth endpoints use this shape rather than the /v1 `ErrorResponse` envelope.
+      required:
+      - error
+      properties:
+        error:
+          type: string
+          enum:
+          - invalid_request
+          - invalid_client
+          - invalid_grant
+          - unauthorized_client
+          - unsupported_grant_type
+          - invalid_scope
+          - access_denied
+          - authorization_pending
+          - slow_down
+          - expired_token
+          - invalid_target
+          - server_error
+          description: A single ASCII error code from RFC 6749 §5.2 / RFC 8628 §3.5 / RFC 8693 §2.2.2.
+          example: invalid_grant
+        error_description:
+          type: string
+          description: Human-readable explanation of the error.
+        error_uri:
+          type: string
+          format: uri
+          description: URI of a human-readable web page with error information.
+    AiGatewayPiiRecognizerCreate:
+      type: object
+      required:
+      - name
+      - kind
+      - pattern
+      properties:
+        name:
+          type: string
+          example: employee_id
+        kind:
+          type: string
+          enum:
+          - regex
+          - aho_corasick
+          - presidio_pattern
+          - presidio_ner
+          - presidio_custom
+        pattern:
+          type: string
+          maxLength: 4096
+          example: EMP-[0-9]{6}
+        context_words:
+          type: array
+          items:
+            type: string
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          default: 0.85
+        action:
+          type: string
+          enum:
+          - redact
+          - tokenize
+          - whitelist
+          - warn
+          default: redact
+        format:
+          type:
+          - string
+          - 'null'
+        enabled:
+          type: boolean
+          default: true
+    PaginationMeta:
+      type: object
+      description: Pagination metadata for list endpoints.
+      properties:
+        total:
+          type: integer
+          description: Total number of records matching the query.
+          example: 42
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        per_page:
+          type: integer
+          description: Number of records per page.
+          example: 20
+        total_pages:
+          type: integer
+          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
+          example: 3
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - total
+      - page
+      - per_page
+      - total_pages
+      - request_id
+    AiGatewayPiiPolicy:
+      type: object
+      description: 'A tenant-scoped bundle of PII recognizers plus a default action, attached to an agent
+
+        through `pii_redact_policy_id`.
+
+        '
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        version:
+          type: integer
+        recognizer_ids:
+          type: array
+          description: 'Recognizers this policy runs. EMPTY means "every enabled recognizer this tenant
+
+            owns" — not "none". That is why deleting a recognizer a policy lists is refused:
+
+            dropping the last id would widen the policy rather than shrink it.
+
+            '
+          items:
+            type: string
+            format: uuid
+        default_action:
+          type: string
+          enum:
+          - redact
+          - tokenize
+          - whitelist
+          - warn
+        description:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+    CreateAiGatewayAgentRequest:
+      type: object
+      required:
+      - name
+      - slug
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        primary_route_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'The route the agent''s upstream calls are proxied through. Pass this OR `provider` + `upstream_secret_id`, never both.
+
+            '
+        provider:
+          type:
+          - string
+          - 'null'
+          enum:
+          - anthropic
+          - openai
+          - gemini
+          - cohere
+          - azure-openai
+          - ollama
+          - groq
+          - together
+          - mistral
+          - deepseek
+          - fireworks
+          - xai
+          - bedrock
+          - openai-compatible
+          - null
+          description: 'Name a provider and KnoxCall composes the upstream route for you, injecting the credential from `upstream_secret_id`. Requires `upstream_secret_id`, and forbids `primary_route_id`.
+
+
+            Ten of these speak the OpenAI Chat Completions API (openai, azure-openai, ollama, groq, together, mistral, deepseek, fireworks, xai, openai-compatible), so an OpenAI SDK works unchanged — point it at the agent URL plus the provider''s OpenAI sub-path (`/v1`, or `/openai/v1` for azure-openai and groq).
+
+
+            `bedrock` is different: it has no static credential header. The secret''s value is a JSON AWS credential (`{"accessKeyId":"…","secretAccessKey":"…","sessionToken":"…"}`) and KnoxCall computes the SigV4 signature server-side over the finalized request, so the AWS secret access key is never transmitted.
+
+            '
+        upstream_secret_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'The secret holding your provider credential. Required whenever `provider` is set.
+
+            '
+        upstream:
+          type:
+          - string
+          - 'null'
+          description: 'Base URL of the upstream, required for the providers whose endpoint is yours rather than the vendor''s: `azure-openai`, `ollama`, `bedrock`, `openai-compatible`.
+
+
+            For `bedrock` and `openai-compatible` this URL is resolved and SSRF-checked before any row is written — a private, loopback or link-local address is refused with a 400, because the request would carry your decrypted provider credential to that destination. `ollama` is deliberately exempt: pointing at your own box on a private network is what that provider is for.
+
+            '
+        default_model:
+          type:
+          - string
+          - 'null'
+          description: 'Defaults to the provider''s own default. Required when `provider` is `openai-compatible` — KnoxCall cannot know which model your endpoint serves, and reports that agent''s cost as unpriced.
+
+            '
+        model_allowlist:
+          type: array
+          items:
+            type: string
+        model_denylist:
+          type: array
+          items:
+            type: string
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+        streaming_enabled:
+          type: boolean
+        firewall_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        pii_redact_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        routing_policy:
+          $ref: '#/components/schemas/AiGatewayRoutingPolicy'
+        guardrail_webhook_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: 'HTTPS endpoint your own scanner listens on (AIGW-45). Every prompt — and, in `response`/`both` mode, every response — is POSTed to it for a verdict before it moves.
+
+
+            What it receives is the REDACTED, post-tokenization body: the same bytes the provider would get, never a resolved provider credential and never your KnoxCall token. Shipping raw PHI to a third party to ask whether it contains PHI would be the leak the gateway exists to prevent.
+
+
+            The destination is resolved and refused at write time AND on every call — a private, loopback, link-local or cloud-metadata address is a 400, because DNS is not a promise.
+
+            '
+        guardrail_webhook_secret_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'Secret holding the HMAC-SHA256 key deliveries are signed with. The signature covers `<timestamp>.<body>` and travels in `x-knox-guardrail-signature` with the timestamp in `x-knox-guardrail-timestamp`, so a captured delivery is not replayable. Omit to send unsigned — the receiver then cannot prove the call came from KnoxCall.
+
+            '
+        guardrail_webhook_mode:
+          type: string
+          enum:
+          - 'off'
+          - request
+          - response
+          - both
+          description: 'Which directions are inspected. `response` and `both` evaluate the complete buffered response before it is sent, so an agent in those modes REFUSES a streaming request (400 `guardrail_streaming_unsupported`) rather than serving one past a control that could not run on it.
+
+            '
+        guardrail_webhook_timeout_ms:
+          type: integer
+          minimum: 100
+          maximum: 10000
+          description: 'How long to wait for a verdict. Clamped, because a request waiting on your scanner is holding one of the gateway''s API workers.
+
+            '
+        guardrail_webhook_failure_action:
+          type: string
+          enum:
+          - fail_open
+          - fail_closed
+          description: 'What happens when the hook does not answer. Applies identically to EVERY non-answer — timeout, refused connection, refused destination, non-2xx, unparseable body, an `action` verb we do not recognise. Defaults to `fail_open`, which is the posture an agent already has with no hook at all.
+
+
+            A hook responds `200` with `{"action":"allow"|"block"|"flag","reason":"…"}`. `block` refuses the request with 400 `guardrail_block` and your `reason` in the message; `flag` serves it and records the outcome.
+
+            '
+        fallback_route_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        model_rewrite:
+          type: object
+          additionalProperties:
+            type: string
+          maxProperties: 100
+          description: Map of requested model → substituted model. Values must be STRINGS (the server validates with a string map) and at most 100 entries.
+        budget_per_call_max_tokens:
+          type:
+          - integer
+          - 'null'
+        budget_overage_action:
+          type: string
+          enum:
+          - block
+          - warn
+          - fallback
+          description: What happens once a budget is exhausted. `fallback` needs `fallback_agent_id`; without one it behaves as `block`.
+        fallback_agent_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        pii_detokenize_response:
+          type: boolean
+          deprecated: true
+          description: AIGW-100 legacy alias for `pii_response_mode` (`true` -> `detokenize`, `false` -> `redact`). Still accepted; sending both with contradictory values is a 400.
+        pii_request_mode:
+          type: string
+          enum:
+          - 'off'
+          - tokenize
+          description: What happens to the PROMPT before it leaves KnoxCall. Default `tokenize`. Set `off` only for an agent whose payload must reach the provider byte-for-byte (structured tool-use JSON, for example) — it means prompts are forwarded unscanned.
+        pii_response_mode:
+          type: string
+          enum:
+          - redact
+          - detokenize
+          description: What happens to the provider's answer. Default `detokenize`.
+        pii_streaming_holdback_chars:
+          type: integer
+          description: How many characters of a STREAMED answer are held back while a detector decides. Larger catches an entity split across more chunks; smaller is lower latency.
+        pii_streaming_mode:
+          type: string
+          enum:
+          - holdback
+          - buffer
+          - monitor
+          description: How a streamed answer is rewritten. `holdback` releases text behind a sliding window; `buffer` withholds the whole answer until it is complete; `monitor` REPORTS detections without rewriting, so the raw value reaches the client — an observability mode, not a redaction one.
+        tags:
+          type: object
+          additionalProperties: true
+          description: FinOps attribution labels (cost_center/team/project/…) echoed onto this agent's usage rows.
+        cache_mode:
+          type: string
+          enum:
+          - 'off'
+          - exact
+          - semantic
+          description: '`semantic` additionally needs `cache_embedding_model`; without one the cache reports itself degraded and serves nothing.'
+        cache_ttl_seconds:
+          type: integer
+        cache_similarity_threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 'Cosine floor for a semantic cache hit, 0–1. Lower means more hits, and more wrong ones. NOT nullable: the column is `NOT NULL` and the validator is non-nullable, so an explicit `null` is a 400.'
+        cache_embedding_model:
+          type:
+          - string
+          - 'null'
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        output_schema:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+          description: JSON Schema the answer is validated against.
+        output_validation_action:
+          type: string
+          enum:
+          - block
+          - retry
+          - warn
+        data_residency_region:
+          type:
+          - string
+          - 'null'
+        cmek_key_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    RequestMeta:
+      type: object
+      description: Metadata included with every API response.
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    AiGatewayTokenExchangeResponse:
+      type: object
+      description: 'RFC 8693 §2.2.1 response. This is a bare OAuth body, NOT the `{data, meta}` envelope
+
+        the rest of `/v1` returns — an OAuth client parses this shape.
+
+        '
+      required:
+      - access_token
+      - issued_token_type
+      - token_type
+      - expires_in
+      properties:
+        access_token:
+          type: string
+          description: 'The capability token, returned ONCE. Send it as `Authorization: Bearer <token>`
+
+            to `/v1/ai` (agent kind) or `/v1/mcp/<slug>` (tool kind, resource-bound).
+
+            '
+          example: kp_live_a_8f3c1d2e5a7b9c0d1e2f3a4b5c6d7e8f_A1B2C3D4
+        issued_token_type:
+          type: string
+          enum:
+          - urn:ietf:params:oauth:token-type:access_token
+        token_type:
+          type: string
+          enum:
+          - Bearer
+        expires_in:
+          type: integer
+          description: Lifetime in seconds, from the binding's `access_token_ttl_seconds` (default 900).
+          example: 900
+        scope:
+          type: string
+          description: 'The capability scope, JSON-encoded, for visibility only. The source of truth is
+
+            the capability HMAC bound into the token — editing this string changes nothing.
+
+            '
+    AiGatewayFirewallPolicyCreate:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          description: 2-64 chars. Re-using an existing name creates the next version.
+        heuristics:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiGatewayFirewallRule'
+        canary_enabled:
+          type: boolean
+          default: true
+        action:
+          type: string
+          enum:
+          - block
+          - warn
+          - tag
+          default: warn
+    AiGatewayFirewallPolicy:
+      type: object
+      description: A tenant-scoped prompt-firewall policy, attachable to agents and MCP servers.
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        version:
+          type: integer
+          description: Bumped when a policy is re-created under the same name.
+        heuristics:
+          type: array
+          description: Tenant rules. The built-in prompt-injection patterns always run in addition to these.
+          items:
+            $ref: '#/components/schemas/AiGatewayFirewallRule'
+        canary_enabled:
+          type:
+          - boolean
+          - 'null'
+          description: Inject a canary token into the system prompt and flag it if the model echoes it back.
+        action:
+          type: string
+          enum:
+          - block
+          - warn
+          - tag
+        created_at:
+          type: string
+          format: date-time
+    AiGatewayPiiPolicyCreate:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          description: 2-64 chars (letters, digits, space, underscore, hyphen). Unique per tenant.
+          example: HIPAA
+        recognizer_ids:
+          type: array
+          description: Must all be recognizers this tenant owns; a foreign id is a 400 `recognizer_not_found`.
+          items:
+            type: string
+            format: uuid
+        default_action:
+          type: string
+          enum:
+          - redact
+          - tokenize
+          - whitelist
+          - warn
+          default: redact
+        description:
+          type: string
+          maxLength: 1000
+    UpdateAiGatewayMcpServerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        upstream_url:
+          type: string
+          format: uri
+        transport:
+          type: string
+          enum:
+          - streamable_http
+          description: Only `streamable_http` is accepted (see the create request).
+        allowed_tools:
+          type: array
+          items:
+            type: string
+        pii_inspection:
+          type: boolean
+        auth:
+          $ref: '#/components/schemas/AiGatewayMcpAuth'
+        status:
+          type: string
+          enum:
+          - active
+          - paused
+          description: Use `DELETE` to archive.
+        pii_redact_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: A PII policy THIS tenant owns (AIGW-151). A policy id you do not own is refused 422 — the FK is id-only, so the ownership check is the control.
+        firewall_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        guardrail_webhook_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: https only; no embedded credentials; SSRF-checked at write time.
+        guardrail_webhook_secret_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        guardrail_webhook_mode:
+          type: string
+          enum:
+          - 'off'
+          - request
+          - response
+          - both
+        guardrail_webhook_timeout_ms:
+          type: integer
+          minimum: 100
+          maximum: 10000
+        guardrail_webhook_failure_action:
+          type: string
+          enum:
+          - fail_open
+          - fail_closed
+    AiGateway:
+      type: object
+      description: An AI gateway — the top-level container that agents are created under.
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Production AI
+        slug:
+          type: string
+          description: Write-once machine handle, unique within the tenant.
+          example: production-ai
+        description:
+          type:
+          - string
+          - 'null'
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+          description: 'Daily spend cap in USD across every agent AND MCP server under this gateway. Null means uncapped. Enforced since AIGW-150; before that it was stored and read by nothing.
+
+            '
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+          description: Monthly spend cap in USD. Null means uncapped.
+        budget_overage_action:
+          type: string
+          enum:
+          - block
+          - warn
+          description: 'What happens when this gateway''s daily or monthly cap is spent (AIGW-150). `block` refuses further requests on BOTH data planes — `/v1/ai` with `429 budget_exceeded`, `/v1/mcp` with a JSON-RPC error on `tools/call` — while `warn` serves and emits the `X-Knox-AI-Budget-*` headers. There is deliberately no `fallback`: that action swaps an agent''s route and model, which a gateway does not have. Gateways created before AIGW-150 that already carried a budget were backfilled to `warn`, because the columns enforced nothing before it.
+
+            '
+        status:
+          type: string
+          enum:
+          - active
+          - paused
+          - archived
+        paused_reason:
+          type:
+          - string
+          - 'null'
+        geo_velocity_action:
+          type: string
+          enum:
+          - 'off'
+          - warn
+          - block
+          description: What to do on an impossible-travel signal across the gateway's tokens.
+        model_aliases:
+          type: object
+          description: 'Model aliases shared by every agent under this gateway (AIGW-42): `{alias: real_model_id}`. Returned on every gateway read — see `UpdateAiGatewayRequest.model_aliases` for how resolution interacts with the per-agent model policy.
+
+            '
+          additionalProperties:
+            type: string
+            maxLength: 200
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type:
+          - string
+          - 'null'
+          description: The API key or user that created the gateway.
+      required:
+      - id
+      - name
+      - slug
+      - status
+      - created_at
+      - updated_at
+    UpsertAiGatewayMcpToolRequest:
+      type: object
+      required:
+      - tool_name
+      properties:
+        tool_name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        input_schema:
+          type: object
+          additionalProperties: true
+        enabled:
+          type: boolean
+          default: true
+  responses:
+    AiGatewayDataPlaneError:
+      description: 'A refusal on the AI data plane, in the one envelope every layer answers with
+
+        (AIGW-163). The HTTP status carries the class; `code` carries the cause.
+
+
+        **400** a policy you configured refused the request — nothing changes on a retry.
+
+        **401** the credential was rejected; mint a new token. **403** the credential is
+
+        valid but not permitted to do this. **404** no agent with that slug for this
+
+        tenant. **422** understood and unprocessable (batch envelope the gateway cannot
+
+        screen, output-schema violation). **429** a ceiling was reached — retry after
+
+        `Retry-After`. **500** our fault. **502** the provider failed after every configured
+
+        failover hop. **503** a control could not be applied, so the request was refused
+
+        rather than served ungoverned — almost never "the gateway is down"; read the code.
+
+
+        The complete code list, and what to do about each, is on the
+
+        [errors page](https://docs.knoxcall.com/ai-gateway/errors).
+
+        '
+      headers:
+        X-Request-Id:
+          description: Correlation id for this call — the key into the `ai_gateway.request_denied` audit row that explains it. Quote it in support requests.
+          schema:
+            type: string
+            format: uuid
+        Retry-After:
+          description: Whole seconds until this refusal could succeed. Sent when the server KNOWS the answer — a spend cap counts to its UTC daily/monthly rollover, a rate limit to the end of its window — and omitted rather than guessed when it does not.
+          schema:
+            type: integer
+            minimum: 1
+        X-Auth-Failure:
+          description: On an authentication or authorization refusal, the same value as `code`. Lets a client or a proxy classify the failure without reading the body.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AiGatewayDataPlaneError'
+          examples:
+            budgetExceeded:
+              summary: 429 — the agent's daily cap is spent (carries Retry-After)
+              value:
+                error: budget_exceeded
+                error_description: 'Daily budget exceeded: $50.0031 ≥ $50'
+                code: budget_exceeded
+                utilization_pct: 100.006
+            expiredToken:
+              summary: 401 — the credential was rejected (also in X-Auth-Failure)
+              value:
+                error: expired
+                error_description: Token has expired
+                code: expired
+            firewallBlock:
+              summary: 400 — a prompt-firewall rule matched under a `block` policy
+              value:
+                error: firewall_block
+                error_description: 'Request blocked by firewall policy: system-prompt-extraction'
+                code: firewall_block
+            piiPolicyDegraded:
+              summary: 503 — a control could not be applied, so nothing was forwarded
+              value:
+                error: pii_policy_degraded
+                error_description: One or more PII recognizers failed to compile, so redaction would be only partly applied. The request was refused rather than forwarded unprotected.
+                code: pii_policy_degraded
+    PlanLimit:
+      description: 'Payment Required. The action exceeds your plan''s limits. Two `error.type` values
+
+        share this status: `plan_limit` when a COUNTED resource quota was reached (routes,
+
+        secrets, AI agents, MCP servers), and `plan_feature` when the CAPABILITY itself is
+
+        not on your tier (custom PII redaction policies, compliance packs, custom
+
+        prompt-firewall policies). Both mean "upgrade to proceed"; branch on `type` only if
+
+        you want to distinguish "you have used your allowance" from "buy a bigger plan".
+
+
+        Neither ever revokes something you already have: a plan downgrade leaves existing
+
+        agents, policies and installed packs in place and keeps working.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: plan_limit
+              message: Route limit reached (10). Upgrade your plan to add more.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    McpUnprocessable:
+      description: 'The MCP server definition was refused. `plaintext_auth` — an `auth.headers`
+
+        value is a literal credential rather than a `{{secret_id:<uuid>}}`
+
+        reference. `validation` — `upstream_url` is not a public https address, or
+
+        a field failed validation. `unsupported_server_type` — `collection` is not
+
+        served yet.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            plaintext_auth:
+              summary: A literal credential in auth.headers
+              value:
+                error:
+                  type: validation
+                  message: auth.headers["Authorization"] must reference a KnoxCall secret, e.g. "Bearer {{secret_id:<uuid>}}".
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            blocked_destination:
+              summary: upstream_url resolves to a private address
+              value:
+                error:
+                  type: validation
+                  message: 'upstream_url is not a valid MCP destination: "169.254.169.254" is in a private/reserved range.'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            unsupported_server_type:
+              summary: collection is not served yet
+              value:
+                error:
+                  type: unsupported_server_type
+                  message: server_type 'collection' is not served yet - an MCP server must proxy an upstream MCP server (server_type 'upstream').
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    Forbidden:
+      description: 'The key is authenticated but not authorized for this action (missing scope), a plan
+
+        limit was reached, or the resource must be managed via OAuth (`use_oauth`) / is a
+
+        protected system client (`system_client_protected`).
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              summary: Missing scope
+              value:
+                error:
+                  type: forbidden
+                  message: This key is not authorized to list AI gateways.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            use_oauth:
+              summary: Resource is OAuth-only
+              value:
+                error:
+                  type: use_oauth
+                  message: This resource must be managed with an OAuth 2.1 access token.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            system_client_protected:
+              summary: Protected system client
+              value:
+                error:
+                  type: system_client_protected
+                  message: This client is managed by the platform and cannot be modified.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    Conflict:
+      description: A resource with the same unique identifier already exists, or the resource is in use.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: conflict
+              message: A route with this name already exists.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    InternalError:
+      description: An unexpected server error occurred.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: internal_error
+              message: An unexpected error occurred.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    Unauthorized:
+      description: Authentication is required or the provided API key is invalid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_key:
+              summary: No API key provided
+              value:
+                error:
+                  type: authentication_required
+                  message: 'API key is required. Use Authorization: Bearer <api_key> or x-api-key header.'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_key:
+              summary: Invalid API key
+              value:
+                error:
+                  type: invalid_api_key
+                  message: Invalid API key.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  headers:
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+  parameters:
+    PerPageParam:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page (max 100).
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: 'OAuth 2.1 authentication — recommended for new integrations. Access tokens
+
+        (`kc_` prefix) are minted at the root-host token endpoint
+
+        `https://api.knoxcall.com/oauth/token` and passed as `Authorization: Bearer <access_token>`.
+
+        Public clients must use PKCE with the `authorization_code` grant; confidential
+
+        clients may use `client_credentials`. The first-party SDKs and the
+
+        `knoxcall login` CLI handle token minting, caching, refresh, and DPoP for you.
+
+        '
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+        authorizationCode:
+          authorizationUrl: https://api.knoxcall.com/oauth/authorize
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+    PhantomToken:
+      type: http
+      scheme: bearer
+      description: "The AI **data plane** credential — a `kp_`-prefixed capability token, not a\nManagement API credential. It is minted per agent (or per MCP resource) at\n`POST /v1/ai-gateway/agents/{agentId}/tokens`, or exchanged from a CI workload's\nOIDC token at `POST /v1/oauth/token`, and it is the ONLY credential `/v1/ai/*`\naccepts: an OAuth `kc_` access token or a `tk_` API key is refused there, and a\n`kp_` token is refused on `api.knoxcall.com`.\n\nThree header spellings are accepted, so an existing provider SDK can be pointed at\nthe agent URL without rewriting its auth:\n\n    Authorization: Bearer kp_live_a_...\n    x-api-key: kp_live_a_...\n    x-knox-ai-key: kp_live_a_...\n\n`kp_live_` is refused on the sandbox host and `kp_test_` on the Live host — the env\nsegment is enforced, not cosmetic. DPoP-bound tokens additionally require a valid\n`DPoP` proof header on every request, signed over the canonical public URL rather\nthan a rewritten `Host`.\n\nA rejected credential answers `401`/`403` in the data-plane error envelope with the\ncause in `code` and in the `X-Auth-Failure` response header.\n"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Legacy long-lived API key authentication via the Authorization header.
+
+        Pass your API key as: `Authorization: Bearer tk_xxx_yyy`.
+
+
+        Standard keys (`tk_` prefix) are accepted on `api.knoxcall.com`.
+
+        Test keys (type=test) are accepted on `sandbox.knoxcall.com`.
+
+        Enterprise Access Keys (`AKE` prefix) are accepted on both.
+
+
+        Fully supported, but prefer the `OAuth2` scheme (or the SDKs, which handle
+
+        OAuth for you) for new integrations.
+
+        '
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: 'Legacy API key authentication via the `x-api-key` header.
+
+        This is an alternative to Bearer token authentication for clients that cannot
+
+        set the `Authorization` header. Prefer the `OAuth2` scheme for new integrations.
+
+        '
+    CapabilityTokenAuth:
+      type: http
+      scheme: bearer
+      description: 'Single-use client capability token (`kct_` prefix), passed as
+
+        `Authorization: Bearer kct_...`. Minted server-side via
+
+        `POST /client-tokens` and bound either to one exact payload + action
+
+        (`decrypt`, `detokenize`) or to one vault + a closed set of page
+
+        origins (`tokenize`). This is NOT an API key — it authenticates only
+
+        the `POST /client/decrypt`, `POST /client/detokenize` and
+
+        `POST /client/tokenize` consume endpoints and is invalidated after its
+
+        first use.
+
+        '

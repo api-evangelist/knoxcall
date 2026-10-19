@@ -1,0 +1,20 @@
+generated: '2026-10-18'
+method: searched
+generator: extract-docs-artifacts.py (local)
+source: https://docs.knoxcall.com/api-reference/ai-gateway/oauth-token
+sources:
+- https://docs.knoxcall.com/api-reference/ai-gateway/oauth-token
+- https://docs.knoxcall.com/api-reference/api-keys/create
+- https://docs.knoxcall.com/api-reference/api-keys/list
+- https://docs.knoxcall.com/api-reference/api-keys/revoke
+description: KnoxCall API uses OAuth Bearer tokens for authentication. API key management endpoints require a minted OAuth access token passed
+  in the Authorization header.
+schemes:
+- type: http-bearer
+  name: OAuth Bearer Token
+  evidence: 'curl -X POST https://api.knoxcall.com/v1/api-keys \ -H "Authorization: Bearer $TOKEN "'
+  location: header
+  header: Authorization
+  how_to_obtain: Minted OAuth access token (see /api-reference/authentication).
+note: No other authentication schemes (apiKey, oauth2, etc.) are described for client authentication on the provided pages.
+docs: https://docs.knoxcall.com/api-reference/ai-gateway/oauth-token

@@ -1,0 +1,28 @@
+generated: '2026-10-18'
+method: searched
+source: https://knoxcall.com/privacy
+signals:
+  data_retention:
+    evidence:
+      - source: https://knoxcall.com/privacy
+        http_status: 200
+        fetched: "true"
+        quote: "We retain your personal data only for as long as necessary to fulfill the purposes outlined in this Privacy Policy:"
+        section: "4. Data Retention"
+        note: "Specifies retention periods for account data, log data, backup data, billing records, and deleted data."
+  data_subject_request:
+    evidence:
+      - source: https://knoxcall.com/privacy
+        http_status: 200
+        fetched: "true"
+        quote: "Access and portability: Receive a copy of the personal data we hold about you, as JSON. ... Deletion: Request deletion of your personal data (subject to legal obligations). ... Restriction: Request restriction of processing your personal data"
+        section: "5. How We Share Your Information"
+        note: "Describes rights to access, delete, restrict, and obtain data portability."
+  subprocessors:
+    evidence:
+      - source: https://knoxcall.com/privacy
+        http_status: 200
+        fetched: "true"
+        quote: "Service Providers: Third-party vendors who perform services on our behalf (payment processing, email delivery, hosting)"
+        section: "5. How We Share Your Information"
+        note: "Identifies third‑party service providers acting as subprocessors."

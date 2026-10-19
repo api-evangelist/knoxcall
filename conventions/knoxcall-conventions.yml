@@ -1,0 +1,34 @@
+generated: '2026-10-18'
+method: derived
+generator: derive-conformance.py
+source: openapi/ (1 document(s), 126 mutating operations)
+idempotency:
+  scope:
+  - acceptOpportunity
+  - createCertificateSecret
+  - createClient
+  - createOAuth2Secret
+  - createRoute
+  - createSecret
+  - createVault
+  - createWebhook
+  - createWorkflow
+  - deleteClient
+  - deleteRoute
+  - deleteSecret
+  - deleteVault
+  - deleteWebhook
+  - deleteWorkflow
+  - escrowWrapCredential
+  - mintWrapToken
+  - updateClient
+  - updateRoute
+  - updateSecret
+  - updateVault
+  - updateWebhook
+  - updateWorkflow
+  coverage: partial
+  header: X-Idempotency-Key
+  mechanism: request header / body token declared in the OpenAPI
+  evidence: X-Idempotency-Key on 23 of 126 mutating operations
+  verified: derived

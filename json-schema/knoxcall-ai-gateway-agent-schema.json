@@ -1,0 +1,376 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/api-evangelist/knoxcall/main/json-schema/knoxcall-ai-gateway-agent-schema.json",
+  "title": "AiGatewayAgent",
+  "description": "An agent under a gateway — the addressable unit an AI SDK points at.",
+  "x-generated": "2026-10-18",
+  "x-method": "derived",
+  "x-generator": "derive-json-schema.py",
+  "x-source": "openapi/knoxcall-openapi.json#/components/schemas/AiGatewayAgent",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenant_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "gateway_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string"
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "primary_route_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "fallback_route_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "model_allowlist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "model_denylist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "default_model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model_rewrite": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 100,
+      "description": "Map of requested model → substituted model. Values must be STRINGS (the server validates with a string map) and at most 100 entries."
+    },
+    "budget_daily_usd": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "budget_monthly_usd": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "budget_per_call_max_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "budget_overage_action": {
+      "type": "string"
+    },
+    "fallback_agent_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "pii_redact_policy_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "pii_detokenize_response": {
+      "type": "boolean",
+      "readOnly": true,
+      "description": "AIGW-100 legacy alias. Read-only mirror of `pii_response_mode == \"detokenize\"`; the column is GENERATED in the database so the two can never disagree. Still ACCEPTED on create and update, where it is folded onto `pii_response_mode`."
+    },
+    "pii_request_mode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "tokenize"
+      ],
+      "description": "What happens to the PROMPT before it leaves KnoxCall. `tokenize` (default) replaces detected entities with conversation-scoped, format-preserving tokens before the provider sees them; `off` forwards the prompt exactly as sent. Independent of `pii_response_mode` — before AIGW-100 request tokenization was gated on the response toggle, so an agent with a PII policy and `pii_detokenize_response: false` sent prompts verbatim."
+    },
+    "pii_response_mode": {
+      "type": "string",
+      "enum": [
+        "redact",
+        "detokenize"
+      ],
+      "description": "What happens to the provider's answer. `redact` runs the detector stack (fresh PII in the completion, canary tokens) and leaves `KC_*` tokens as tokens; `detokenize` (default) also swaps them back to this conversation's originals. There is no `off` — the detector stack runs on every 2xx."
+    },
+    "pii_streaming_holdback_chars": {
+      "type": "integer"
+    },
+    "pii_streaming_mode": {
+      "type": "string"
+    },
+    "cache_mode": {
+      "type": "string"
+    },
+    "cache_ttl_seconds": {
+      "type": "integer"
+    },
+    "cache_similarity_threshold": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "cache_embedding_model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "streaming_enabled": {
+      "type": "boolean"
+    },
+    "firewall_policy_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "tool_allowlist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "output_schema": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true
+    },
+    "output_validation_action": {
+      "type": "string"
+    },
+    "data_residency_region": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "us",
+        "eu",
+        "uk",
+        "ca",
+        "au",
+        "jp",
+        "in",
+        null
+      ],
+      "description": "AIGW-53: pin this agent's upstream egress to a data-residency region. When set, a request whose upstream endpoint KnoxCall cannot classify as serving that region is refused on the data plane with HTTP 403 `residency_violation` — including a fallback route, which is where an unpinned failover would otherwise leave the region. `null` (the default) applies no residency constraint. See https://docs.knoxcall.com/ai-gateway/data-residency for the endpoints KnoxCall classifies and for what this control does and does not guarantee."
+    },
+    "cmek_key_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "AIGW-53: the `tenant_master_keys` id this agent's AI data (its PII token map) is encrypted under. Must be one of THIS tenant's keys and must be customer-managed (`wrap_method = customer_kms`, i.e. BYOK configured) — a KnoxCall-wrapped key is refused, because a CMEK the platform can unwrap is not a CMEK. If the key is missing, retired, revoked, or your KMS refuses to unwrap it, the data-plane request is refused with HTTP 503 `cmek_unavailable` rather than written under a different key."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "archived"
+      ]
+    },
+    "paused_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "FinOps attribution labels (cost_center/team/project/…) echoed onto this agent's usage rows."
+    },
+    "provider": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The upstream shape this agent fronts — one of the values `CreateAiGatewayAgentRequest.provider` enumerates (the catalog has grown to fourteen; `ai_gateway_agents_provider_check` is the authority). Set once, at create time, and deliberately NOT patchable: changing it without re-pointing `primary_route_id` at a matching route would make the stored value a lie. `null` on an agent created before the field existed whose route shape the backfill did not recognise — render that as \"custom\", never as a guess."
+    },
+    "routing_policy": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/AiGatewayRoutingPolicy"
+        }
+      ],
+      "description": "Returned on every agent read. `{}` — the default for every agent — means one attempt per route and fail-over to `fallback_route_ids` on 5xx only.\n"
+    },
+    "guardrail_webhook_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "description": "The external scanner this agent POSTs to for a verdict, or null when it has none. See `CreateAiGatewayAgentRequest.guardrail_webhook_url` for what the hook receives and how the destination is refused.\n"
+    },
+    "guardrail_webhook_secret_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Secret holding the HMAC-SHA256 key deliveries are signed with, or null when deliveries are sent unsigned.\n"
+    },
+    "guardrail_webhook_mode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "request",
+        "response",
+        "both"
+      ],
+      "description": "Which directions are inspected. `off` when the agent has no hook — the server returns the string, never a boolean.\n"
+    },
+    "guardrail_webhook_timeout_ms": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 10000,
+      "description": "How long the gateway waits for a verdict. Defaults to 2000."
+    },
+    "guardrail_webhook_failure_action": {
+      "type": "string",
+      "enum": [
+        "fail_open",
+        "fail_closed"
+      ],
+      "description": "What happens when the hook does not answer. Defaults to `fail_open`, the posture an agent already has with no hook at all.\n"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "agent_url": {
+      "type": "string",
+      "description": "The data-plane base URL for this agent — `https://{tenant}.knoxcall.com/v1/ai/{slug}`.\nPoint an AI SDK's `base_url` here and give it a capability token as the API key.\n\nPresent on EVERY agent projection: create, get, update and the list rows (AIGW-160\nera it was create and get only, so a list row was shaped differently from the row\ncreate returned). It is server-computed rather than stored, so it MOVES when `slug`\nchanges — which is why `PATCH` returns it too.\n\nAn EMPTY STRING when the tenant slug cannot be resolved. Treat empty as \"not\navailable\", never as a URL.\n"
+    }
+  },
+  "required": [
+    "id",
+    "gateway_id",
+    "name",
+    "slug",
+    "status",
+    "agent_url",
+    "created_at",
+    "updated_at"
+  ],
+  "$defs": {
+    "AiGatewayRoutingPolicy": {
+      "type": "object",
+      "description": "How this agent retries and spreads load (AIGW-42). An empty object — the default for every agent — means one attempt per route and fail-over to `fallback_route_ids` on 5xx only, which is the behaviour the gateway has always had.\n\nEvery field is clamped server-side. A request parked waiting to retry occupies an API worker, so `max_attempts` caps at 5, any single delay at 30s, a honoured `Retry-After` at 60s, and the total sleep for one request at 60s regardless of how the fields combine.\n",
+      "additionalProperties": false,
+      "properties": {
+        "retry_on": {
+          "type": "array",
+          "description": "Which outcomes are retried on the SAME route before failing over. `429` also promotes a rate-limit response to a fail-over trigger; without it a 429 is returned to you immediately, unchanged.\n",
+          "items": {
+            "type": "string",
+            "enum": [
+              "429",
+              "5xx",
+              "timeout"
+            ]
+          }
+        },
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Attempts per candidate route, including the first. Forced to 1 when `retry_on` is empty, so a stored policy never claims a retry that cannot happen.\n"
+        },
+        "backoff_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000,
+          "description": "Delay before the second attempt."
+        },
+        "backoff_multiplier": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "max_backoff_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000
+        },
+        "respect_retry_after": {
+          "type": "boolean",
+          "description": "Default true. An upstream `Retry-After` is honoured when it asks for LONGER than the computed backoff — it can extend a wait, never shorten one.\n"
+        },
+        "max_retry_after_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000,
+          "description": "Ceiling on a honoured `Retry-After`."
+        },
+        "jitter": {
+          "type": "boolean",
+          "description": "Default true. Spreads each delay across 50–100% of its computed value so a fleet does not retry in lockstep.\n"
+        },
+        "route_weights": {
+          "type": "object",
+          "description": "`{route_id: weight}`. When present, the route that serves a request is chosen in proportion to its weight across the primary and every fallback, and the remainder stay in weighted order for fail-over. A route not named here keeps weight 1; a route weighted 0 is drained and receives no traffic at all, including fail-over traffic. The token's own capability scope is enforced on every candidate, so a weight can never reach a route the token was not granted.\n",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        }
+      }
+    }
+  }
+}

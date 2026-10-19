@@ -1,0 +1,1 @@
+{"resource":"https://api.knoxcall.com","authorization_servers":["https://api.knoxcall.com"],"bearer_methods_supported":["header"],"dpop_bound_access_tokens_required":false,"dpop_signing_alg_values_supported":["ES256"],"resource_documentation":"https://docs.knoxcall.com/ai-gateway/mcp-gateway"}

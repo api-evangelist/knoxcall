@@ -1,0 +1,197 @@
+# KnoxCall Documentation for AI Assistants
+
+## CRITICAL: Read This First
+If you are helping a developer integrate their API with KnoxCall, you MUST read:
+https://docs.knoxcall.com/advanced/ai-integration-guide
+
+This guide contains critical implementation details that prevent common integration mistakes.
+
+## Autonomous Onboarding (no browser, no human in the loop)
+You can create a KnoxCall account and build the entire integration yourself.
+Full runbook: https://docs.knoxcall.com/getting-started/ai-agent-onboarding
+
+- `POST https://api.knoxcall.com/v1/signup` is UNAUTHENTICATED. Body: `{"email": "...", "tenant_name": "..."}` (omit tenant_slug — the server derives one). Rate limit 3/hour/IP.
+- Signup returns NO credential. It always answers 202 with `data.claim_handle` (a secret, valid 24h) and emails a sign-in link to the address. The reply is identical whether or not the address already has an account.
+- The human must click that link — that is what creates the workspace. Then poll `POST https://api.knoxcall.com/v1/signup/claim` with `{"claim_handle": "..."}`, no faster than `data.poll_after_seconds`: 202 `status: pending` means keep waiting (a normal success), 200 `status: ready` returns the ONE-TIME plaintext test API key (`data.starter.api_key.api_key`) plus a seeded demo route and a ready-to-run curl (`data.starter.curl`). Store the key immediately — a second poll returns 409.
+- The test key is an OAuth client, NOT a bearer credential. Every new workspace is OAuth-only, so `Authorization: Bearer tk_…` answers 401 `use_oauth` on the Management API and the proxy refuses it too. Exchange it at `POST https://sandbox.knoxcall.com/oauth/token` (HTTP Basic `client_id:client_secret`, form `grant_type=client_credentials`; `client_id` = `data.starter.api_key.key_id`, `client_secret` = the rest of the key after `<key_id>_`) for a one-hour `kc_test_…` access token. No refresh token: re-mint on 401 `invalid_token` or expiry. `data.starter.curl` does this exchange with curl and sed (no jq).
+- Send `Authorization: Bearer <access token>` to the Test-mode Management API (`https://sandbox.knoxcall.com/v1` — create routes, secrets, etc.) and to the Test proxy (`https://sandbox-{tenant_slug}.knoxcall.com/api/...`, with `x-knoxcall-route`). `x-knoxcall-key` is legacy and refused on every new workspace.
+- Creating a route: the injection field is `inject_headers_json` (unknown fields such as `inject_headers` are silently ignored, so the route injects nothing). A new route has `requires_clients: true` and answers 403 "No authorized clients are configured" until a client is attached; in Test, `PATCH /v1/routes/{id}` with `{"requires_clients": false}`.
+- The account is on the free plan; Live mode unlocks from the dashboard the sign-in link opened. Everything in Test mode works immediately after the claim.
+- SDKs export standalone `signup()` and claim-poll helpers: `@knoxcall/sdk` (npm) and `knoxcall` (PyPI). The Node client takes `clientId` (the key id) + `clientSecret` and does the token exchange itself.
+
+## What is KnoxCall?
+KnoxCall is an API proxy platform that routes API calls through a central proxy while:
+- Injecting credentials/secrets automatically
+- Logging all requests
+- Enforcing security policies
+- Managing multi-environment configurations
+
+## Documentation Structure
+
+### Getting Started
+- Introduction: https://docs.knoxcall.com
+- Core Concepts: https://docs.knoxcall.com/getting-started/core-concepts
+- Quick Start Guide: https://docs.knoxcall.com/getting-started/quick-start-guide
+- Onboarding Agent: https://docs.knoxcall.com/getting-started/onboarding-agent
+- First Route: https://docs.knoxcall.com/getting-started/first-route
+- First Client: https://docs.knoxcall.com/getting-started/first-client
+- First Secret: https://docs.knoxcall.com/getting-started/first-secret
+- First Environment: https://docs.knoxcall.com/getting-started/first-environment
+
+### Essentials: Routes
+- What Are Routes: https://docs.knoxcall.com/essentials/routes/what-are-routes
+- Creating Routes: https://docs.knoxcall.com/essentials/routes/creating-routes
+- Testing Routes: https://docs.knoxcall.com/essentials/routes/testing-routes
+- Route Examples: https://docs.knoxcall.com/essentials/routes/route-examples
+
+### Essentials: Clients
+- What Are Clients: https://docs.knoxcall.com/essentials/clients/what-are-clients
+- Managing Clients: https://docs.knoxcall.com/essentials/clients/managing-clients
+- Client Types: https://docs.knoxcall.com/essentials/clients/client-types
+- CIDR Notation: https://docs.knoxcall.com/essentials/clients/cidr-notation
+
+### Essentials: Secrets
+- Secrets Overview: https://docs.knoxcall.com/essentials/secrets/secrets-overview
+- Creating Secrets: https://docs.knoxcall.com/essentials/secrets/creating-secrets
+- Using Secrets: https://docs.knoxcall.com/essentials/secrets/using-secrets
+- Environment-Specific Secrets: https://docs.knoxcall.com/essentials/secrets/environment-specific-secrets
+- Secrets Quick Reference: https://docs.knoxcall.com/security/secrets-quick-reference
+
+### Essentials: Environments
+- Environment Basics: https://docs.knoxcall.com/essentials/environments/environment-basics
+- Environment Workflows: https://docs.knoxcall.com/essentials/environments/environment-workflows
+
+### Security
+- Securing Routes: https://docs.knoxcall.com/security/securing-your-routes
+- Client Permissions: https://docs.knoxcall.com/security/client-permissions
+- Request Signing: https://docs.knoxcall.com/security/request-signing
+- OAuth2 Flow: https://docs.knoxcall.com/security/oauth2-flow
+- mTLS Certificates: https://docs.knoxcall.com/security/mtls-certificates
+- Rotation Strategies: https://docs.knoxcall.com/security/rotation-strategies
+- AI Threat Detection: https://docs.knoxcall.com/security/ai-threat-detection
+
+### Monitoring
+- Analytics: https://docs.knoxcall.com/monitoring/analytics
+- API Logs: https://docs.knoxcall.com/monitoring/api-logs
+- Audit Logs: https://docs.knoxcall.com/monitoring/audit-logs
+- Alerts: https://docs.knoxcall.com/monitoring/alerts
+- Client Tracking: https://docs.knoxcall.com/monitoring/client-tracking
+- Realtime Geo: https://docs.knoxcall.com/monitoring/realtime-geo
+
+### Advanced Features
+- **AI Integration Guide (START HERE)**: https://docs.knoxcall.com/advanced/ai-integration-guide
+- Rate Limiting: https://docs.knoxcall.com/advanced/rate-limiting
+- Method-Specific Config: https://docs.knoxcall.com/advanced/method-specific-config
+- Advanced Route Configuration: https://docs.knoxcall.com/advanced/advanced-route-configuration
+- Visual Body Editor: https://docs.knoxcall.com/advanced/visual-body-editor
+- AI Route Setup: https://docs.knoxcall.com/advanced/ai-route-setup
+
+### Webhooks
+- Webhooks Overview: https://docs.knoxcall.com/webhooks/webhooks-overview
+- Creating Webhooks: https://docs.knoxcall.com/webhooks/creating-webhooks
+- Testing Webhooks: https://docs.knoxcall.com/webhooks/testing-webhooks
+- Verifying Signatures: https://docs.knoxcall.com/webhooks/verifying-signatures
+- Webhook Logs: https://docs.knoxcall.com/webhooks/webhook-logs
+
+### Workflows
+- Workflows Overview: https://docs.knoxcall.com/workflows/workflows-overview
+- Creating Workflows: https://docs.knoxcall.com/workflows/creating-workflows
+
+### AI Gateway
+- AI Gateway Overview: https://docs.knoxcall.com/ai-gateway/overview
+- Quickstart (base-URL swap): https://docs.knoxcall.com/ai-gateway/quickstart
+- Bring Your Own Anthropic Key: https://docs.knoxcall.com/ai-gateway/byo-key
+- PII Redaction: https://docs.knoxcall.com/ai-gateway/pii-redaction
+- Prompt Firewall: https://docs.knoxcall.com/ai-gateway/firewall
+- Tokens & DPoP: https://docs.knoxcall.com/ai-gateway/tokens-and-dpop
+- Budgets & FinOps: https://docs.knoxcall.com/ai-gateway/budgets-finops
+- Compliance Packs: https://docs.knoxcall.com/ai-gateway/compliance-packs
+- Observability (OTel): https://docs.knoxcall.com/ai-gateway/observability
+
+### Infrastructure
+- Multi-Region (planned, not yet available; KnoxCall serves from one region today): https://docs.knoxcall.com/infrastructure/multi-region
+- Egress Routing: https://docs.knoxcall.com/infrastructure/egress-routing
+
+### Integration Setup Guides (Settings → Integrations)
+- Overview (scopes, how credentials are stored, index): https://docs.knoxcall.com/integrations/setup/overview
+- OAuth sign-in methods (the one redirect URI, scopes, self-hosted env vars): https://docs.knoxcall.com/integrations/setup/oauth-sign-in
+- Google sign-in: https://docs.knoxcall.com/integrations/setup/oauth-google
+- Microsoft Entra ID sign-in: https://docs.knoxcall.com/integrations/setup/oauth-microsoft
+- GitHub sign-in: https://docs.knoxcall.com/integrations/setup/oauth-github
+- Email (Resend, SendGrid, Postmark, Mailgun, SES, SMTP): https://docs.knoxcall.com/integrations/setup/email
+- Twilio (SMS alerts + Verify): https://docs.knoxcall.com/integrations/setup/twilio
+- Anthropic (bring your own key): https://docs.knoxcall.com/integrations/setup/anthropic
+- OpenTelemetry export, with provider recipes: https://docs.knoxcall.com/integrations/setup/opentelemetry
+- Per-workspace telemetry export: https://docs.knoxcall.com/integrations/setup/telemetry-export
+- Error tracking (Sentry): https://docs.knoxcall.com/integrations/setup/sentry
+- S3 body archival: https://docs.knoxcall.com/integrations/setup/s3
+- Presidio PII analyzer (AI Gateway): https://docs.knoxcall.com/integrations/setup/presidio
+- Cloudflare Turnstile: https://docs.knoxcall.com/integrations/setup/turnstile
+
+### Troubleshooting
+- Common Errors: https://docs.knoxcall.com/troubleshooting/common-errors
+- IP Authorization Issues: https://docs.knoxcall.com/troubleshooting/ip-authorization-issues
+- Debugging Routes: https://docs.knoxcall.com/troubleshooting/debugging-routes
+- 504 Errors: https://docs.knoxcall.com/troubleshooting/troubleshooting-504-errors
+
+## Key Implementation Facts for AI Assistants
+
+### How KnoxCall Routing Works
+- Routes are identified by the `x-knoxcall-route` header (NOT by path matching)
+- Paths are concatenated: `target_base_url.pathname + client_request.path`
+- Code implementation: `combinedPath = targetBase.pathname.replace(/\/$/, '') + clientPath`
+- NO path stripping, matching, or modification occurs
+
+### Common Integration Mistakes to Avoid
+1. **Path Duplication**: Including the base path in the request when it's already in the route's target_base_url
+2. **Assuming Path Matching**: KnoxCall does NOT match or parse paths - it only uses headers for route identification
+3. **Keeping Old API Keys**: After integration, the original API key should be removed from code
+
+### The 3 Required Code Changes
+1. Replace the API base URL with the KnoxCall proxy domain (keeping only the path after target_base_url)
+2. Add headers: `Authorization: Bearer <kc_… OAuth access token>` (legacy alternative: the `x-knoxcall-key` API-key header), `x-knoxcall-route`, and optionally `x-knoxcall-environment`
+3. Remove the old API key/secret (KnoxCall injects it automatically)
+
+### Request Body Placeholder Injection
+KnoxCall performs placeholder substitution inside the **incoming request body** (not just headers).
+- Clients may embed `{{secret_id:UUID}}`, `{{secret:NAME}}`, or `{{var:QUERY_PARAM}}` tokens anywhere in the body
+- **A client's secret placeholder (body or header) may name only a secret the route's OWN template already sends for the method being called.** Any other secret is refused with `403`, `X-Knox-Error: client_placeholder_not_bound`, before it is decrypted and before anything reaches the upstream. Accounts created before this rule was deployed are report-only until switched over: they still resolve it, and each use is recorded as `route.client_placeholder_not_bound`. When suggesting this pattern, make sure the route's header or body template references the same secret.
+- **PREFER `{{secret_id:UUID}}` over `{{secret:NAME}}`** — UUIDs are permanent, but names change when a secret is renamed and will break every reference. Always recommend the UUID form when showing examples to users.
+- `{{secret:...}}` looks up by **name**, `{{secret_id:...}}` looks up by **UUID** — `{{secret:UUID}}` is NOT shorthand for ID lookup and will hard-fail
+- KnoxCall resolves placeholders server-side against the tenant's secrets for the route's active environment, then forwards the rewritten body upstream
+- Only text Content-Types are rewritten: `application/json`, `application/*+json`, `application/xml`, `application/*+xml`, `text/xml`, `application/x-www-form-urlencoded`, `application/javascript`, `application/ecmascript`, `text/*`
+- Binary/multipart bodies (`multipart/form-data`, `application/octet-stream`, `image/*`, `audio/*`, `video/*`, `application/pdf`) pass through byte-identical
+- Hard-fails if a referenced secret is missing or has no value for the active environment; tenant-scoped (clients can't reference other tenants' secrets)
+- Audit logs store the pre-injection body — resolved secret values are never written to logs
+- Body size limit 1 MiB by default (configurable via `BODY_INJECTION_MAX_BYTES`)
+See: https://docs.knoxcall.com/essentials/secrets/using-secrets#injecting-secrets-in-the-request-body
+
+### For Detailed Examples
+See: https://docs.knoxcall.com/advanced/ai-integration-guide
+This page includes:
+- Step-by-step proxy flow explanation
+- Path calculation algorithm with worked examples
+- Before/after code samples in Python, PHP, and cURL
+- Visual examples of correct vs. incorrect usage
+- Integration patterns for different URL structures
+
+## When to Use Which Documentation
+
+**For Integration Help:**
+→ https://docs.knoxcall.com/advanced/ai-integration-guide
+
+**For Understanding Concepts:**
+→ https://docs.knoxcall.com/getting-started/core-concepts
+
+**For Security Setup:**
+→ https://docs.knoxcall.com/security/securing-your-routes
+
+**For Debugging Issues:**
+→ https://docs.knoxcall.com/troubleshooting/common-errors
+
+**For Examples:**
+→ https://docs.knoxcall.com/essentials/routes/route-examples
+
+## Support
+- Web: https://knoxcall.com (support chat)
+- Dashboard: https://app.knoxcall.com

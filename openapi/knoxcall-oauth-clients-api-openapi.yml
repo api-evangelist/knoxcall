@@ -1,0 +1,1598 @@
+openapi: 3.2.0
+info:
+  title: KnoxCall Client Management OAuth Clients API
+  version: '1.0'
+  description: 'The KnoxCall Client Management API provides programmatic access to manage your API gateway
+
+    resources including routes, secrets, clients, environments, webhooks, and API keys. ## Authentication
+
+
+    All requests must include an OAuth 2.1 access token **or** a legacy API key. The
+
+    recommended path for new integrations is the first-party SDKs, which mint, cache, and
+
+    refresh OAuth tokens for you (start with `knoxcall login` on a developer machine, or
+
+    `KNOXCALL_CLIENT_ID` / `KNOXCALL_CLIENT_SECRET` in CI). You can authenticate using any of:
+
+
+    - **Authorization header (OAuth 2.1 bearer token — recommended)**: `Authorization: Bearer `
+
+    - **Authorization header (legacy API key)**: `Authorization: Bearer tk_xxx_yyy`
+
+    - **x-api-key header (legacy API key)**: `x-api-key: tk_xxx_yyy`
+
+
+    OAuth 2.1 access tokens (`kc_` prefix) are minted at the root-host token endpoint
+
+    `https://api.knoxcall.com/oauth/token` (not under `/v1`) using the `client_credentials`
+
+    or `authorization_code` grant. See the `OAuth2` security scheme and the `/oauth/*`
+
+    endpoints. Some resources that are managed exclusively through OAuth reject API-key auth
+
+    with a `403 use_oauth` error. Long-lived API keys remain fully supported. They come in three types:
+
+    - **Standard keys** (`tk_` prefix) are used on the production API (`api.knoxcall.com`). - **Test keys** (`tk_` prefix, type=test) are used on the sandbox API (`sandbox.knoxcall.com`). - **Enterprise Access Keys** (`AKE` prefix) follow the format `AKE[16chars]:[40chars]`. Using a test key on the production API (or vice versa) will return a `403 wrong_key_type` error. ## Request IDs
+
+
+    Every response — success or error — includes an `X-Request-Id` response header (a UUID). Its value is identical to the `request_id` field in the response body (`meta.request_id`
+
+    on success, `error.request_id` on error). Quote it when contacting support. ## API Versioning
+
+
+    The API is versioned on two axes:
+
+
+    - **Major version — the `/v1` path prefix.** Breaking changes ship under a new major
+
+    (`/v2`). `/v1` never receives a breaking change. - **Minor version — the `KnoxCall-Version` header (dated, `YYYY-MM-DD`).** Send
+
+    `KnoxCall-Version: 2026-08-05` to pin the behaviour of a specific dated release. Omit
+
+    the header to get the newest minor version. Every response echoes the resolved version
+
+    back in a `KnoxCall-Version` response header. Within a major version, **additive changes are not breaking** and may appear without a new
+
+    dated version: new endpoints, new optional request fields, new response fields, new
+
+    `error.type` values, and new enum members. Clients must tolerate unknown response fields
+
+    and unknown `error.type` values (see the `ErrorResponse` schema). An **unknown or malformed** `KnoxCall-Version` value returns `400` with
+
+    `error.type: invalid_api_version`. ## Rate Limiting
+
+
+    API keys can have optional rate limits configured. When a limit is configured, the
+
+    following headers are emitted on **every** response (not only `429`s):
+
+    - `X-RateLimit-Limit` -- maximum requests allowed per window
+
+    - `X-RateLimit-Remaining` -- remaining requests in the current window
+
+    - `X-RateLimit-Reset` -- epoch seconds at which the window resets
+
+
+    When the limit is exceeded the API returns `429` (`rate_limit_exceeded` / `rate_limited`)
+
+    and additionally sets `Retry-After` (seconds until the window resets). ## DPoP sender-constrained tokens, and the server nonce
+
+
+    A token minted with a `cnf.jkt` binding (DPoP, RFC 9449) requires a `DPoP` proof header
+
+    on every request, signed over the request''s method and canonical public URL. **Every response to a request that carried a `DPoP` header also carries a
+
+    `DPoP-Nonce` response header** -- mints, refusals and successful calls alike, on
+
+    `POST /oauth/token`, `/v1`, the tenant data plane, the self-hosted proxy and the AI
+
+    gateway. The value is stateless and changes every minute; the server accepts the current
+
+    and the previous minute''s, so a nonce is good for 60-120 seconds.'
+  contact:
+    name: KnoxCall Support
+    url: https://knoxcall.com
+    email: support@knoxcall.com
+  license:
+    name: Proprietary
+    url: https://knoxcall.com/terms
+servers:
+- url: https://api.knoxcall.com/v1
+  description: Production
+- url: https://sandbox.knoxcall.com/v1
+  description: Sandbox (test keys only)
+security:
+- OAuth2: []
+- BearerAuth: []
+- ApiKeyAuth: []
+tags:
+- name: OAuth Clients
+  description: Manage OAuth 2.1 clients used to mint access tokens for the API.
+paths:
+  /oauth-clients:
+    get:
+      operationId: listOAuthClients
+      summary: List OAuth clients
+      description: 'Returns all OAuth clients for the account, newest first. This endpoint
+
+        is **not paginated** and its response carries no `meta` object.'
+      tags:
+      - OAuth Clients
+      responses:
+        '200':
+          description: List of OAuth clients.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OAuthClient'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createOAuthClient
+      summary: Create an OAuth client
+      description: 'Creates an OAuth 2.1 client. Confidential clients receive a
+
+        `client_secret` in the response — **it is shown exactly once and can
+
+        never be retrieved again** (public clients get `client_secret: null`).
+
+        `redirect_uris` are required when the `authorization_code` grant is
+
+        enabled and must use `https://` (or `http://localhost`).
+
+
+        `allowed_scopes` must narrow something: an empty list and a universal
+
+        entry (`*` or `*:*`) both mean "every scope" and are refused with `400`.
+
+
+        **Called with a scope-narrowed OAuth token**, the client you create must be
+
+        one that token could itself hold: every `allowed_scopes` entry must appear
+
+        verbatim in the token''s own scope, and `grant_types` must be
+
+        `client_credentials` only (any other grant lets the client act as a
+
+        different principal). Otherwise the call returns `403 privilege_escalation`
+
+        and nothing is created.'
+      tags:
+      - OAuth Clients
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOAuthClientRequest'
+            example:
+              name: CI token minting
+              type: confidential
+              grant_types:
+              - client_credentials
+              allowed_scopes:
+              - routes:read
+              - secrets:read
+      responses:
+        '200':
+          description: The created OAuth client. Copy `client_secret` now — it is never shown again.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OAuthClientCreated'
+                  warning:
+                    type: string
+                    description: Present for confidential clients — reminds you to store the secret.
+                    example: Copy the client_secret now — it will never be shown again.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`privilege_escalation` — the calling OAuth token is scope-narrowed and the
+
+            requested client exceeds its grant (see above). Also returned as ordinary
+
+            `forbidden` when the caller lacks `oauth_client:create`.
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /oauth-clients/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The OAuth client UUID (not the public `client_id`).
+    get:
+      operationId: getOAuthClient
+      summary: Get OAuth client details
+      description: Returns a single OAuth client. The response carries no `meta` object.
+      tags:
+      - OAuth Clients
+      responses:
+        '200':
+          description: OAuth client details.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OAuthClientDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateOAuthClient
+      summary: Update an OAuth client
+      description: 'Updates one or more fields. Only provided fields are changed. Grant
+
+        types cannot be changed after creation.
+
+
+        **`step_up_scopes` requires an explicit `oauth_client:step_up_manage`
+
+        policy grant**, which no seeded role carries and no wildcard (`*:*`)
+
+        rule satisfies. That field controls the re-authentication a HUMAN is
+
+        forced through at both consent surfaces - the authorize endpoint and
+
+        the device-activation page a CLI login uses - so a machine credential
+
+        may not weaken it casually; the `/admin` twin demands a fresh step-up
+
+        verification instead. A request whose body carries `step_up_scopes`
+
+        without the grant returns `403 forbidden` and changes nothing - including
+
+        the other fields in the same body. Every other field needs only
+
+        `oauth_client:update`.
+
+
+        **`active: false` is a containment action and it is permanent for the
+
+        tokens outstanding at that moment.** Disabling a client revokes every
+
+        access and refresh token it has issued, exactly as `DELETE
+
+        /v1/oauth-clients/{id}` does. Re-enabling the client with `active: true`
+
+        restores its ability to MINT new tokens; it does not bring the revoked
+
+        ones back. Send `active: false` only when you mean to end the credential,
+
+        not to pause it.
+
+
+        Setting `allowed_scopes` to a universal list (`*` or `*:*`) is refused
+
+        with `400` unless the client already holds one — re-sending the list a
+
+        client already has is not a change.
+
+
+        **Called with a scope-narrowed OAuth token**, the client as it will exist
+
+        after the update must be one that token could itself hold — the same rule
+
+        as create, judged on the stored `allowed_scopes` when the body omits them.
+
+        Otherwise the call returns `403 privilege_escalation` and nothing changes.'
+      tags:
+      - OAuth Clients
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOAuthClientRequest'
+            example:
+              allowed_scopes:
+              - routes:read
+              active: true
+      responses:
+        '200':
+          description: Update acknowledged.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`privilege_escalation` — the calling OAuth token is scope-narrowed and the
+
+            client would exceed its grant after this update. Also returned as ordinary
+
+            `forbidden` when the caller lacks `oauth_client:update` (or, for
+
+            `step_up_scopes`, `oauth_client:step_up_manage`).
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: revokeOAuthClient
+      summary: Revoke an OAuth client
+      description: Revokes the client. Existing tokens stop working and the client cannot be reactivated.
+      tags:
+      - OAuth Clients
+      responses:
+        '200':
+          description: OAuth client revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      revoked:
+                        type: boolean
+                        example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /oauth-clients/{id}/rotate-secret:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The OAuth client UUID.
+    post:
+      operationId: rotateOAuthClientSecret
+      summary: Rotate the client secret
+      description: 'Generates a new `client_secret` for a confidential client, immediately
+
+        invalidating the old one. **The new secret is shown exactly once.**
+
+        Public clients return `400` (they have no secret).
+
+
+        **Rotation is containment.** Every access and refresh token the old
+
+        secret minted is revoked in the same transaction as the re-key, so
+
+        `/oauth/introspect` reports them inactive immediately rather than for
+
+        the remainder of their TTL. If the revocation cannot complete, the
+
+        rotation is refused and the old secret keeps working — you never end up
+
+        holding a new secret for a client whose old tokens are still live. The
+
+        number of tokens revoked is recorded on the audit entry.
+
+
+        **Requires an explicit `oauth_client:rotate_secret` policy grant.** No
+
+        seeded role carries it, and a wildcard (`*:*`) rule does not satisfy it.
+
+        The `/admin` twin of this operation demands a fresh human step-up
+
+        verification, and a machine credential has no session to step up, so the
+
+        machine-plane equivalent is a grant the tenant authors deliberately in
+
+        Settings -> Permissions. Without it the call returns `403 forbidden` and
+
+        no secret is minted. `oauth_client:rotate` alone is not sufficient.
+
+
+        **Called with a scope-narrowed OAuth token**, rotation is refused with
+
+        `403 privilege_escalation` unless the client is one that token could itself
+
+        hold (the create rule, judged on the stored client) — otherwise it would
+
+        hand back the secret of a credential wider than the token.'
+      tags:
+      - OAuth Clients
+      responses:
+        '200':
+          description: The new client secret. Store it now — it is never shown again.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      client_id:
+                        type: string
+                        example: tk_1a2b3c4d
+                      client_secret:
+                        type: string
+                        description: The new secret. Shown only in this response.
+                  warning:
+                    type: string
+                    example: Copy the new client_secret now — it will never be shown again.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`forbidden` when the caller lacks `oauth_client:rotate_secret`;
+
+            `privilege_escalation` when a scope-narrowed OAuth token targets a client
+
+            wider than its own grant.
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /oauth/token:
+    servers:
+    - url: https://api.knoxcall.com
+      description: Root host — OAuth endpoints are served outside the /v1 base path.
+    post:
+      operationId: oauthToken
+      summary: OAuth 2.1 token endpoint
+      description: 'Mint an OAuth 2.1 access token (RFC 6749 §3.2 / OAuth 2.1). Supported grants:
+
+        `client_credentials`, `authorization_code` (public clients must send a PKCE
+
+        `code_verifier`), `refresh_token`, and `urn:ietf:params:oauth:grant-type:device_code`
+
+        (RFC 8628). The request body is `application/x-www-form-urlencoded`. Confidential
+
+        clients authenticate with `client_id` + `client_secret` (in the body or via HTTP
+
+        Basic); public clients send `client_id` only.'
+      tags:
+      - OAuth Clients
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OAuthTokenRequest'
+            examples:
+              client_credentials:
+                summary: Client credentials grant
+                value:
+                  grant_type: client_credentials
+                  client_id: kc_client_abc123
+                  client_secret: kc_secret_xyz789
+                  scope: routes:read routes:write
+              authorization_code_pkce:
+                summary: Authorization code grant with PKCE
+                value:
+                  grant_type: authorization_code
+                  client_id: kc_client_abc123
+                  code: 5f6a7b8c9d0e
+                  redirect_uri: https://app.example.com/callback
+                  code_verifier: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+      responses:
+        '200':
+          description: Access token issued.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthTokenResponse'
+        '400':
+          description: Invalid grant, malformed request, or unsupported grant type (RFC 6749 §5.2).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+              example:
+                error: invalid_grant
+                error_description: The authorization code is invalid or has expired.
+        '401':
+          description: Client authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+              example:
+                error: invalid_client
+                error_description: Client authentication failed.
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /oauth/introspect:
+    servers:
+    - url: https://api.knoxcall.com
+      description: Root host — OAuth endpoints are served outside the /v1 base path.
+    post:
+      operationId: oauthIntrospect
+      summary: OAuth 2.0 token introspection
+      description: 'Determine the active state and metadata of a token (RFC 7662). The client must
+
+        authenticate with its `client_id` + `client_secret`. The request body is
+
+        `application/x-www-form-urlencoded`.'
+      tags:
+      - OAuth Clients
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OAuthIntrospectRequest'
+            example:
+              token: eyJhbGciOiJI...
+              token_type_hint: access_token
+              client_id: kc_client_abc123
+              client_secret: kc_secret_xyz789
+      responses:
+        '200':
+          description: Introspection result. `active` is `false` for unknown, expired, or revoked tokens.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthIntrospectionResponse'
+        '401':
+          description: Client authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+              example:
+                error: invalid_client
+                error_description: Client authentication failed.
+  /oauth/revoke:
+    servers:
+    - url: https://api.knoxcall.com
+      description: Root host — OAuth endpoints are served outside the /v1 base path.
+    post:
+      operationId: oauthRevoke
+      summary: OAuth 2.0 token revocation
+      description: 'Revoke an access or refresh token (RFC 7009). The client must authenticate with its
+
+        `client_id` + `client_secret`. Per spec, revocation returns `200` even when the
+
+        token is unknown. The request body is `application/x-www-form-urlencoded`.'
+      tags:
+      - OAuth Clients
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OAuthRevokeRequest'
+            example:
+              token: eyJhbGciOiJI...
+              token_type_hint: refresh_token
+              client_id: kc_client_abc123
+              client_secret: kc_secret_xyz789
+      responses:
+        '200':
+          description: The token has been revoked (or was already invalid). No content body is guaranteed.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+        '401':
+          description: Client authentication failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+              example:
+                error: invalid_client
+                error_description: Client authentication failed.
+  /oauth/device_authorization:
+    servers:
+    - url: https://api.knoxcall.com
+      description: Root host — OAuth endpoints are served outside the /v1 base path.
+    post:
+      operationId: oauthDeviceAuthorization
+      summary: OAuth 2.0 device authorization request
+      description: 'Begin the device authorization grant (RFC 8628). Returns a `device_code` and a
+
+        human-enterable `user_code`; the client then polls `POST /oauth/token` with
+
+        `grant_type=urn:ietf:params:oauth:grant-type:device_code`. The request body is
+
+        `application/x-www-form-urlencoded`.'
+      tags:
+      - OAuth Clients
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OAuthDeviceAuthorizationRequest'
+            example:
+              client_id: kc_client_abc123
+              scope: routes:read
+      responses:
+        '200':
+          description: Device and user codes issued.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthDeviceAuthorizationResponse'
+        '400':
+          description: Invalid request (e.g. unknown `client_id`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthError'
+              example:
+                error: invalid_client
+                error_description: Unknown client_id.
+  /.well-known/oauth-authorization-server:
+    servers:
+    - url: https://api.knoxcall.com
+      description: Root host — the discovery document is served outside the /v1 base path.
+    get:
+      operationId: oauthServerMetadata
+      summary: OAuth 2.0 authorization server metadata
+      description: 'Authorization server metadata discovery document (RFC 8414). Lists the endpoints,
+
+        supported grant types, response types, and scopes.'
+      tags:
+      - OAuth Clients
+      security: []
+      responses:
+        '200':
+          description: Authorization server metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthServerMetadata'
+components:
+  headers:
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+    X-RateLimit-Reset:
+      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
+
+        response whenever a rate limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1735689600
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+    X-RateLimit-Remaining:
+      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 999
+    Retry-After:
+      description: Seconds to wait before retrying. Set on `429` responses.
+      schema:
+        type: integer
+      example: 30
+    X-RateLimit-Limit:
+      description: 'Maximum requests allowed per window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1000
+  schemas:
+    OAuthIntrospectRequest:
+      type: object
+      description: OAuth token introspection request (RFC 7662 §2.1). Sent as `application/x-www-form-urlencoded`.
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: The token to introspect.
+        token_type_hint:
+          type: string
+          enum:
+          - access_token
+          - refresh_token
+          description: Hint about the type of the token submitted.
+        client_id:
+          type: string
+          description: The introspecting client's identifier.
+        client_secret:
+          type: string
+          description: The introspecting client's secret.
+    CreateOAuthClientRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: Human-readable client name. At most 255 characters.
+          example: CI token minting
+        type:
+          type: string
+          enum:
+          - confidential
+          - public
+          default: confidential
+        grant_types:
+          type: array
+          items:
+            type: string
+            enum:
+            - client_credentials
+            - authorization_code
+            - refresh_token
+            - urn:ietf:params:oauth:grant-type:token-exchange
+            - urn:ietf:params:oauth:grant-type:device_code
+          description: Grant types to enable. Defaults to `["client_credentials"]`.
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+          example:
+          - routes:read
+          - secrets:read
+        redirect_uris:
+          type: array
+          items:
+            type: string
+          description: Required when the `authorization_code` grant is enabled. Must use `https://`, or `http://` on a loopback host (`localhost`, `127.0.0.1`, `[::1]`) for native/CLI apps per RFC 8252 §7.3 — loopback IP-literal URIs match on any port at authorization time.
+        require_dpop:
+          type: boolean
+          default: false
+          description: Require DPoP-bound tokens.
+        require_pkce:
+          type: boolean
+          default: true
+          description: Require PKCE for the authorization-code flow.
+        token_format:
+          type: string
+          enum:
+          - opaque
+          default: opaque
+          description: Optional; the only accepted value is `opaque`. Any other value — including the withdrawn RFC 9068 `jwt` — is refused with 400.
+    OAuthDeviceAuthorizationRequest:
+      type: object
+      description: OAuth device authorization request (RFC 8628 §3.1). Sent as `application/x-www-form-urlencoded`.
+      required:
+      - client_id
+      properties:
+        client_id:
+          type: string
+          description: The public client's identifier.
+          example: kc_client_abc123
+        scope:
+          type: string
+          description: Space-delimited list of requested scopes.
+          example: routes:read
+    OAuthServerMetadata:
+      type: object
+      description: OAuth 2.0 authorization server metadata (RFC 8414).
+      required:
+      - issuer
+      - token_endpoint
+      properties:
+        issuer:
+          type: string
+          format: uri
+          example: https://api.knoxcall.com
+        authorization_endpoint:
+          type: string
+          format: uri
+          example: https://api.knoxcall.com/oauth/authorize
+        token_endpoint:
+          type: string
+          format: uri
+          example: https://api.knoxcall.com/oauth/token
+        introspection_endpoint:
+          type: string
+          format: uri
+          example: https://api.knoxcall.com/oauth/introspect
+        revocation_endpoint:
+          type: string
+          format: uri
+          example: https://api.knoxcall.com/oauth/revoke
+        device_authorization_endpoint:
+          type: string
+          format: uri
+          example: https://api.knoxcall.com/oauth/device_authorization
+        grant_types_supported:
+          type: array
+          items:
+            type: string
+          example:
+          - client_credentials
+          - authorization_code
+          - refresh_token
+          - urn:ietf:params:oauth:grant-type:device_code
+        response_types_supported:
+          type: array
+          items:
+            type: string
+          example:
+          - code
+        token_endpoint_auth_methods_supported:
+          type: array
+          items:
+            type: string
+          example:
+          - client_secret_basic
+          - client_secret_post
+          - none
+        code_challenge_methods_supported:
+          type: array
+          items:
+            type: string
+          example:
+          - S256
+        scopes_supported:
+          type: array
+          items:
+            type: string
+          example:
+          - routes:read
+          - routes:write
+          - secrets:read
+          - secrets:write
+          - '*:*'
+    OAuthClientCreated:
+      type: object
+      description: The newly created OAuth client, including its one-time secret.
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          example: tk_1a2b3c4d
+        client_secret:
+          type:
+          - string
+          - 'null'
+          description: '**Shown exactly once — it can never be retrieved again.** Null for public clients.'
+        type:
+          type: string
+          enum:
+          - confidential
+          - public
+        grant_types:
+          type: array
+          items:
+            type: string
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        redirect_uris:
+          type: array
+          items:
+            type: string
+    OAuthTokenResponse:
+      type: object
+      description: OAuth 2.1 access token response (RFC 6749 §5.1).
+      required:
+      - access_token
+      - token_type
+      - expires_in
+      properties:
+        access_token:
+          type: string
+          description: The issued access token (JWT).
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          enum:
+          - Bearer
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Access token lifetime in seconds.
+          example: 3600
+        scope:
+          type: string
+          description: Space-delimited list of granted scopes (may be narrower than requested).
+          example: routes:read routes:write
+        refresh_token:
+          type: string
+          description: A refresh token, when the grant issues one.
+        tenant:
+          type: string
+          format: uuid
+          description: The tenant the token is scoped to.
+          example: 3b5d7c9e-1f2a-4b6d-8c0e-2a4c6b8d0e1f
+        client_id:
+          type: string
+          description: The client the token was issued to.
+          example: kc_client_abc123
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
+    UpdateOAuthClientRequest:
+      type: object
+      description: Any subset of fields may be supplied; at least one is required. Grant types cannot be changed after creation.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        redirect_uris:
+          type: array
+          items:
+            type: string
+          description: Must use `https://` (or `http://localhost`).
+        require_dpop:
+          type: boolean
+        require_pkce:
+          type: boolean
+        active:
+          type: boolean
+        token_format:
+          type: string
+          enum:
+          - opaque
+          description: The only accepted value is `opaque`. Any other value — including the withdrawn RFC 9068 `jwt` — is refused with 400 and nothing is written.
+        consent_html_template:
+          type:
+          - string
+          - 'null'
+          maxLength: 65536
+          description: Custom consent-page HTML template. Pass null or an empty string to reset to the default. At most 65536 characters.
+        step_up_scopes:
+          type: array
+          items:
+            type: string
+          description: Scopes that require step-up authentication.
+    OAuthClientDetail:
+      type: object
+      description: Full OAuth client detail.
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          example: tk_1a2b3c4d
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+          - confidential
+          - public
+        grant_types:
+          type: array
+          items:
+            type: string
+          example:
+          - client_credentials
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        redirect_uris:
+          type: array
+          items:
+            type: string
+        require_dpop:
+          type: boolean
+        require_pkce:
+          type: boolean
+        token_format:
+          type: string
+          enum:
+          - opaque
+          description: Always `opaque`; see OAuthClient.
+        step_up_scopes:
+          type: array
+          items:
+            type: string
+          description: Scopes that require step-up authentication.
+        active:
+          type: boolean
+        revoked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        source_api_key_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    OAuthError:
+      type: object
+      description: OAuth 2.1 error response (RFC 6749 §5.2). The OAuth endpoints use this shape rather than the /v1 `ErrorResponse` envelope.
+      required:
+      - error
+      properties:
+        error:
+          type: string
+          enum:
+          - invalid_request
+          - invalid_client
+          - invalid_grant
+          - unauthorized_client
+          - unsupported_grant_type
+          - invalid_scope
+          - access_denied
+          - authorization_pending
+          - slow_down
+          - expired_token
+          - invalid_target
+          - server_error
+          description: A single ASCII error code from RFC 6749 §5.2 / RFC 8628 §3.5 / RFC 8693 §2.2.2.
+          example: invalid_grant
+        error_description:
+          type: string
+          description: Human-readable explanation of the error.
+        error_uri:
+          type: string
+          format: uri
+          description: URI of a human-readable web page with error information.
+    OAuthTokenRequest:
+      type: object
+      description: OAuth 2.1 token request (RFC 6749 §4, RFC 8628 §3.4). Sent as `application/x-www-form-urlencoded`.
+      required:
+      - grant_type
+      properties:
+        grant_type:
+          type: string
+          enum:
+          - client_credentials
+          - authorization_code
+          - refresh_token
+          - urn:ietf:params:oauth:grant-type:device_code
+          description: The OAuth 2.1 grant type.
+          example: client_credentials
+        client_id:
+          type: string
+          description: The OAuth client identifier. Required for public clients; confidential clients may instead use HTTP Basic auth.
+        client_secret:
+          type: string
+          description: The OAuth client secret (confidential clients only).
+        scope:
+          type: string
+          description: Space-delimited list of requested scopes.
+          example: routes:read routes:write
+        code:
+          type: string
+          description: Authorization code (for `authorization_code` grant).
+        redirect_uri:
+          type: string
+          format: uri
+          description: Must match the redirect URI used in the authorization request (`authorization_code` grant).
+        code_verifier:
+          type: string
+          description: PKCE code verifier (RFC 7636). Required for public clients using the `authorization_code` grant.
+        refresh_token:
+          type: string
+          description: The refresh token (for `refresh_token` grant).
+        device_code:
+          type: string
+          description: The device code (for the device-code grant).
+    OAuthIntrospectionResponse:
+      type: object
+      description: OAuth token introspection response (RFC 7662 §2.2).
+      required:
+      - active
+      properties:
+        active:
+          type: boolean
+          description: Whether the token is currently active (not expired, not revoked, and known).
+          example: true
+        scope:
+          type: string
+          description: Space-delimited granted scopes.
+          example: routes:read
+        client_id:
+          type: string
+          example: kc_client_abc123
+        token_type:
+          type: string
+          example: Bearer
+        exp:
+          type: integer
+          description: Expiry time as epoch seconds.
+          example: 1735689600
+        iat:
+          type: integer
+          description: Issued-at time as epoch seconds.
+          example: 1735686000
+        sub:
+          type: string
+          description: Subject of the token.
+        require_dpop:
+          type: boolean
+          description: 'Non-standard member (RFC 7662 §2.2 permits extensions). `true` when the
+
+            token''s owning client is configured to require DPoP-bound tokens. A
+
+            resource server MUST refuse a token whose `cnf.jkt` is absent while this
+
+            is `true` — KnoxCall''s own data plane and `/v1` API both do.
+
+            '
+          example: false
+        tenant:
+          type: string
+          format: uuid
+          description: The tenant the token is scoped to.
+    OAuthRevokeRequest:
+      type: object
+      description: OAuth token revocation request (RFC 7009 §2.1). Sent as `application/x-www-form-urlencoded`.
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: The token to revoke.
+        token_type_hint:
+          type: string
+          enum:
+          - access_token
+          - refresh_token
+          description: Hint about the type of the token submitted.
+        client_id:
+          type: string
+        client_secret:
+          type: string
+    OAuthDeviceAuthorizationResponse:
+      type: object
+      description: OAuth device authorization response (RFC 8628 §3.2).
+      required:
+      - device_code
+      - user_code
+      - verification_uri
+      - expires_in
+      properties:
+        device_code:
+          type: string
+          description: The device verification code.
+          example: GmRhmhcxhwEzkoEqiMEg_DnyEysNkuNhszIySk9eS
+        user_code:
+          type: string
+          description: The end-user verification code to enter at `verification_uri`.
+          example: WDJB-MJHT
+        verification_uri:
+          type: string
+          format: uri
+          description: The end-user verification URI.
+          example: https://knoxcall.com/device
+        verification_uri_complete:
+          type: string
+          format: uri
+          description: The verification URI with the `user_code` pre-filled (optional, RFC 8628).
+          example: https://knoxcall.com/device?user_code=WDJB-MJHT
+        expires_in:
+          type: integer
+          description: Lifetime of the `device_code` and `user_code` in seconds.
+          example: 900
+        interval:
+          type: integer
+          description: Minimum seconds the client should wait between polling `POST /oauth/token`.
+          example: 5
+    OAuthClient:
+      type: object
+      description: An OAuth 2.1 client as returned in list responses.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 2b7e1516-28ae-d2a6-abf7-158809cf4f3c
+        client_id:
+          type: string
+          description: Public client identifier used in token requests.
+          example: tk_1a2b3c4d
+        name:
+          type: string
+          example: CI token minting
+        type:
+          type: string
+          enum:
+          - confidential
+          - public
+          description: Confidential clients hold a `client_secret`; public clients do not.
+        grant_types:
+          type: array
+          items:
+            type: string
+            enum:
+            - client_credentials
+            - authorization_code
+            - refresh_token
+            - urn:ietf:params:oauth:grant-type:token-exchange
+            - urn:ietf:params:oauth:grant-type:device_code
+          description: Enabled OAuth grant types.
+          example:
+          - client_credentials
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+          example:
+          - routes:read
+          - secrets:read
+        redirect_uris:
+          type: array
+          items:
+            type: string
+          description: Registered redirect URIs (authorization-code flow). Loopback URIs (http://127.0.0.1/... or http://[::1]/...) match on any port per RFC 8252 §7.3.
+        system_role:
+          type:
+          - string
+          - 'null'
+          enum:
+          - cli
+          - null
+          description: Set to `cli` on the tenant's auto-provisioned KnoxCall CLI client (created by `knoxcall login`). System clients cannot be updated or deleted via the API.
+        require_dpop:
+          type: boolean
+          description: Whether tokens minted for this client must be DPoP-bound.
+        require_pkce:
+          type: boolean
+          description: Whether the authorization-code flow requires PKCE.
+        token_format:
+          type: string
+          enum:
+          - opaque
+          description: 'Format of access tokens minted for this client. Always `opaque` (random `kc_` tokens checked against KnoxCall on every call). The RFC 9068 `jwt` format was withdrawn: no KnoxCall resource server ever accepted it.'
+        active:
+          type: boolean
+        revoked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        source_api_key_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: The API key this client was mirrored from, if it was auto-created alongside a key.
+        source_key_type:
+          type:
+          - string
+          - 'null'
+          description: Key type of the source API key, if any.
+  responses:
+    RateLimited:
+      description: 'Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
+
+        also present on non-429 responses whenever a limit is configured.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: rate_limit_exceeded
+              message: API rate limit exceeded. Please retry later.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    InternalError:
+      description: An unexpected server error occurred.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: internal_error
+              message: An unexpected error occurred.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    Unauthorized:
+      description: Authentication is required or the provided API key is invalid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_key:
+              summary: No API key provided
+              value:
+                error:
+                  type: authentication_required
+                  message: 'API key is required. Use Authorization: Bearer <api_key> or x-api-key header.'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_key:
+              summary: Invalid API key
+              value:
+                error:
+                  type: invalid_api_key
+                  message: Invalid API key.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: 'OAuth 2.1 authentication — recommended for new integrations. Access tokens
+
+        (`kc_` prefix) are minted at the root-host token endpoint
+
+        `https://api.knoxcall.com/oauth/token` and passed as `Authorization: Bearer <access_token>`.
+
+        Public clients must use PKCE with the `authorization_code` grant; confidential
+
+        clients may use `client_credentials`. The first-party SDKs and the
+
+        `knoxcall login` CLI handle token minting, caching, refresh, and DPoP for you.
+
+        '
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+        authorizationCode:
+          authorizationUrl: https://api.knoxcall.com/oauth/authorize
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+    PhantomToken:
+      type: http
+      scheme: bearer
+      description: "The AI **data plane** credential — a `kp_`-prefixed capability token, not a\nManagement API credential. It is minted per agent (or per MCP resource) at\n`POST /v1/ai-gateway/agents/{agentId}/tokens`, or exchanged from a CI workload's\nOIDC token at `POST /v1/oauth/token`, and it is the ONLY credential `/v1/ai/*`\naccepts: an OAuth `kc_` access token or a `tk_` API key is refused there, and a\n`kp_` token is refused on `api.knoxcall.com`.\n\nThree header spellings are accepted, so an existing provider SDK can be pointed at\nthe agent URL without rewriting its auth:\n\n    Authorization: Bearer kp_live_a_...\n    x-api-key: kp_live_a_...\n    x-knox-ai-key: kp_live_a_...\n\n`kp_live_` is refused on the sandbox host and `kp_test_` on the Live host — the env\nsegment is enforced, not cosmetic. DPoP-bound tokens additionally require a valid\n`DPoP` proof header on every request, signed over the canonical public URL rather\nthan a rewritten `Host`.\n\nA rejected credential answers `401`/`403` in the data-plane error envelope with the\ncause in `code` and in the `X-Auth-Failure` response header.\n"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Legacy long-lived API key authentication via the Authorization header.
+
+        Pass your API key as: `Authorization: Bearer tk_xxx_yyy`.
+
+
+        Standard keys (`tk_` prefix) are accepted on `api.knoxcall.com`.
+
+        Test keys (type=test) are accepted on `sandbox.knoxcall.com`.
+
+        Enterprise Access Keys (`AKE` prefix) are accepted on both.
+
+
+        Fully supported, but prefer the `OAuth2` scheme (or the SDKs, which handle
+
+        OAuth for you) for new integrations.
+
+        '
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: 'Legacy API key authentication via the `x-api-key` header.
+
+        This is an alternative to Bearer token authentication for clients that cannot
+
+        set the `Authorization` header. Prefer the `OAuth2` scheme for new integrations.
+
+        '
+    CapabilityTokenAuth:
+      type: http
+      scheme: bearer
+      description: 'Single-use client capability token (`kct_` prefix), passed as
+
+        `Authorization: Bearer kct_...`. Minted server-side via
+
+        `POST /client-tokens` and bound either to one exact payload + action
+
+        (`decrypt`, `detokenize`) or to one vault + a closed set of page
+
+        origins (`tokenize`). This is NOT an API key — it authenticates only
+
+        the `POST /client/decrypt`, `POST /client/detokenize` and
+
+        `POST /client/tokenize` consume endpoints and is invalidated after its
+
+        first use.
+
+        '

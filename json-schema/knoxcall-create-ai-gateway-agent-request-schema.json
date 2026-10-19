@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/api-evangelist/knoxcall/main/json-schema/knoxcall-create-ai-gateway-agent-request-schema.json",
+  "title": "CreateAiGatewayAgentRequest",
+  "x-generated": "2026-10-18",
+  "x-method": "derived",
+  "x-generator": "derive-json-schema.py",
+  "x-source": "openapi/knoxcall-openapi.json#/components/schemas/CreateAiGatewayAgentRequest",
+  "type": "object",
+  "required": [
+    "name",
+    "slug"
+  ],
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string"
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "primary_route_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "The route the agent's upstream calls are proxied through. Pass this OR `provider` + `upstream_secret_id`, never both.\n"
+    },
+    "provider": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "anthropic",
+        "openai",
+        "gemini",
+        "cohere",
+        "azure-openai",
+        "ollama",
+        "groq",
+        "together",
+        "mistral",
+        "deepseek",
+        "fireworks",
+        "xai",
+        "bedrock",
+        "openai-compatible",
+        null
+      ],
+      "description": "Name a provider and KnoxCall composes the upstream route for you, injecting the credential from `upstream_secret_id`. Requires `upstream_secret_id`, and forbids `primary_route_id`.\n\nTen of these speak the OpenAI Chat Completions API (openai, azure-openai, ollama, groq, together, mistral, deepseek, fireworks, xai, openai-compatible), so an OpenAI SDK works unchanged — point it at the agent URL plus the provider's OpenAI sub-path (`/v1`, or `/openai/v1` for azure-openai and groq).\n\n`bedrock` is different: it has no static credential header. The secret's value is a JSON AWS credential (`{\"accessKeyId\":\"…\",\"secretAccessKey\":\"…\",\"sessionToken\":\"…\"}`) and KnoxCall computes the SigV4 signature server-side over the finalized request, so the AWS secret access key is never transmitted.\n"
+    },
+    "upstream_secret_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "The secret holding your provider credential. Required whenever `provider` is set.\n"
+    },
+    "upstream": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Base URL of the upstream, required for the providers whose endpoint is yours rather than the vendor's: `azure-openai`, `ollama`, `bedrock`, `openai-compatible`.\n\nFor `bedrock` and `openai-compatible` this URL is resolved and SSRF-checked before any row is written — a private, loopback or link-local address is refused with a 400, because the request would carry your decrypted provider credential to that destination. `ollama` is deliberately exempt: pointing at your own box on a private network is what that provider is for.\n"
+    },
+    "default_model": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Defaults to the provider's own default. Required when `provider` is `openai-compatible` — KnoxCall cannot know which model your endpoint serves, and reports that agent's cost as unpriced.\n"
+    },
+    "model_allowlist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "model_denylist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "budget_daily_usd": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "budget_monthly_usd": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "streaming_enabled": {
+      "type": "boolean"
+    },
+    "firewall_policy_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "pii_redact_policy_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "routing_policy": {
+      "$ref": "#/$defs/AiGatewayRoutingPolicy"
+    },
+    "guardrail_webhook_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "description": "HTTPS endpoint your own scanner listens on (AIGW-45). Every prompt — and, in `response`/`both` mode, every response — is POSTed to it for a verdict before it moves.\n\nWhat it receives is the REDACTED, post-tokenization body: the same bytes the provider would get, never a resolved provider credential and never your KnoxCall token. Shipping raw PHI to a third party to ask whether it contains PHI would be the leak the gateway exists to prevent.\n\nThe destination is resolved and refused at write time AND on every call — a private, loopback, link-local or cloud-metadata address is a 400, because DNS is not a promise.\n"
+    },
+    "guardrail_webhook_secret_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Secret holding the HMAC-SHA256 key deliveries are signed with. The signature covers `<timestamp>.<body>` and travels in `x-knox-guardrail-signature` with the timestamp in `x-knox-guardrail-timestamp`, so a captured delivery is not replayable. Omit to send unsigned — the receiver then cannot prove the call came from KnoxCall.\n"
+    },
+    "guardrail_webhook_mode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "request",
+        "response",
+        "both"
+      ],
+      "description": "Which directions are inspected. `response` and `both` evaluate the complete buffered response before it is sent, so an agent in those modes REFUSES a streaming request (400 `guardrail_streaming_unsupported`) rather than serving one past a control that could not run on it.\n"
+    },
+    "guardrail_webhook_timeout_ms": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 10000,
+      "description": "How long to wait for a verdict. Clamped, because a request waiting on your scanner is holding one of the gateway's API workers.\n"
+    },
+    "guardrail_webhook_failure_action": {
+      "type": "string",
+      "enum": [
+        "fail_open",
+        "fail_closed"
+      ],
+      "description": "What happens when the hook does not answer. Applies identically to EVERY non-answer — timeout, refused connection, refused destination, non-2xx, unparseable body, an `action` verb we do not recognise. Defaults to `fail_open`, which is the posture an agent already has with no hook at all.\n\nA hook responds `200` with `{\"action\":\"allow\"|\"block\"|\"flag\",\"reason\":\"…\"}`. `block` refuses the request with 400 `guardrail_block` and your `reason` in the message; `flag` serves it and records the outcome.\n"
+    },
+    "fallback_route_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "model_rewrite": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "maxProperties": 100,
+      "description": "Map of requested model → substituted model. Values must be STRINGS (the server validates with a string map) and at most 100 entries."
+    },
+    "budget_per_call_max_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "budget_overage_action": {
+      "type": "string",
+      "enum": [
+        "block",
+        "warn",
+        "fallback"
+      ],
+      "description": "What happens once a budget is exhausted. `fallback` needs `fallback_agent_id`; without one it behaves as `block`."
+    },
+    "fallback_agent_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "pii_detokenize_response": {
+      "type": "boolean",
+      "deprecated": true,
+      "description": "AIGW-100 legacy alias for `pii_response_mode` (`true` -> `detokenize`, `false` -> `redact`). Still accepted; sending both with contradictory values is a 400."
+    },
+    "pii_request_mode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "tokenize"
+      ],
+      "description": "What happens to the PROMPT before it leaves KnoxCall. Default `tokenize`. Set `off` only for an agent whose payload must reach the provider byte-for-byte (structured tool-use JSON, for example) — it means prompts are forwarded unscanned."
+    },
+    "pii_response_mode": {
+      "type": "string",
+      "enum": [
+        "redact",
+        "detokenize"
+      ],
+      "description": "What happens to the provider's answer. Default `detokenize`."
+    },
+    "pii_streaming_holdback_chars": {
+      "type": "integer",
+      "description": "How many characters of a STREAMED answer are held back while a detector decides. Larger catches an entity split across more chunks; smaller is lower latency."
+    },
+    "pii_streaming_mode": {
+      "type": "string",
+      "enum": [
+        "holdback",
+        "buffer",
+        "monitor"
+      ],
+      "description": "How a streamed answer is rewritten. `holdback` releases text behind a sliding window; `buffer` withholds the whole answer until it is complete; `monitor` REPORTS detections without rewriting, so the raw value reaches the client — an observability mode, not a redaction one."
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "FinOps attribution labels (cost_center/team/project/…) echoed onto this agent's usage rows."
+    },
+    "cache_mode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "exact",
+        "semantic"
+      ],
+      "description": "`semantic` additionally needs `cache_embedding_model`; without one the cache reports itself degraded and serves nothing."
+    },
+    "cache_ttl_seconds": {
+      "type": "integer"
+    },
+    "cache_similarity_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Cosine floor for a semantic cache hit, 0–1. Lower means more hits, and more wrong ones. NOT nullable: the column is `NOT NULL` and the validator is non-nullable, so an explicit `null` is a 400."
+    },
+    "cache_embedding_model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tool_allowlist": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "output_schema": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true,
+      "description": "JSON Schema the answer is validated against."
+    },
+    "output_validation_action": {
+      "type": "string",
+      "enum": [
+        "block",
+        "retry",
+        "warn"
+      ]
+    },
+    "data_residency_region": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cmek_key_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    }
+  },
+  "$defs": {
+    "AiGatewayRoutingPolicy": {
+      "type": "object",
+      "description": "How this agent retries and spreads load (AIGW-42). An empty object — the default for every agent — means one attempt per route and fail-over to `fallback_route_ids` on 5xx only, which is the behaviour the gateway has always had.\n\nEvery field is clamped server-side. A request parked waiting to retry occupies an API worker, so `max_attempts` caps at 5, any single delay at 30s, a honoured `Retry-After` at 60s, and the total sleep for one request at 60s regardless of how the fields combine.\n",
+      "additionalProperties": false,
+      "properties": {
+        "retry_on": {
+          "type": "array",
+          "description": "Which outcomes are retried on the SAME route before failing over. `429` also promotes a rate-limit response to a fail-over trigger; without it a 429 is returned to you immediately, unchanged.\n",
+          "items": {
+            "type": "string",
+            "enum": [
+              "429",
+              "5xx",
+              "timeout"
+            ]
+          }
+        },
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Attempts per candidate route, including the first. Forced to 1 when `retry_on` is empty, so a stored policy never claims a retry that cannot happen.\n"
+        },
+        "backoff_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000,
+          "description": "Delay before the second attempt."
+        },
+        "backoff_multiplier": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "max_backoff_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000
+        },
+        "respect_retry_after": {
+          "type": "boolean",
+          "description": "Default true. An upstream `Retry-After` is honoured when it asks for LONGER than the computed backoff — it can extend a wait, never shorten one.\n"
+        },
+        "max_retry_after_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000,
+          "description": "Ceiling on a honoured `Retry-After`."
+        },
+        "jitter": {
+          "type": "boolean",
+          "description": "Default true. Spreads each delay across 50–100% of its computed value so a fleet does not retry in lockstep.\n"
+        },
+        "route_weights": {
+          "type": "object",
+          "description": "`{route_id: weight}`. When present, the route that serves a request is chosen in proportion to its weight across the primary and every fallback, and the remainder stay in weighted order for fail-over. A route not named here keeps weight 1; a route weighted 0 is drained and receives no traffic at all, including fail-over traffic. The token's own capability scope is enforced on every candidate, so a weight can never reach a route the token was not granted.\n",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        }
+      }
+    }
+  }
+}

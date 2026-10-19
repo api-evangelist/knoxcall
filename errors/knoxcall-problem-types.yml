@@ -1,0 +1,104 @@
+generated: '2026-10-18'
+method: derived
+generator: derive-problem-types.py
+source:
+- openapi/knoxcall-openapi.json
+format: custom
+envelope:
+  media_type: application/json
+  schema: ErrorResponse
+coverage:
+  operations: 192
+  statuses_declared: 13
+problems:
+- status: 400
+  title: Bad Request
+  description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns
+    `400 invalid_idempotency_key`.
+  operations: 95
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 401
+  title: Unauthorized
+  description: Authentication is required or the provided API key is invalid.
+  operations: 180
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 402
+  title: Payment Required
+  description: Payment Required. The action exceeds your plan's limits. Two `error.type` values
+  operations: 16
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 403
+  title: Forbidden
+  description: The key is authenticated but not authorized for this action (missing scope), a plan
+  operations: 64
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 404
+  title: Not Found
+  description: The requested resource was not found.
+  operations: 125
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 409
+  title: Conflict
+  description: A resource with the same unique identifier already exists, or the resource is in use.
+  operations: 41
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 413
+  title: Content Too Large
+  description: More than 200 observations in one request. Split the batch.
+  operations: 1
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 422
+  title: Unprocessable Content
+  description: The supplied idempotency key was already used for a request with a different body.
+  operations: 21
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 429
+  title: Too Many Requests
+  description: Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
+  operations: 20
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 500
+  title: Internal Server Error
+  description: An unexpected server error occurred.
+  operations: 154
+  media_types:
+  - application/json
+  schema: ErrorResponse
+- status: 502
+  title: Bad Gateway
+  description: A refusal on the AI data plane, in the one envelope every layer answers with
+  operations: 3
+  media_types:
+  - application/json
+  schema: AiGatewayDataPlaneError
+- status: 503
+  title: Service Unavailable
+  description: A refusal on the AI data plane, in the one envelope every layer answers with
+  operations: 3
+  media_types:
+  - application/json
+  schema: AiGatewayDataPlaneError
+- status: default
+  title: null
+  description: Passthrough of the upstream response (status, headers, and body).
+  operations: 5
+  media_types: []
+  schema: null

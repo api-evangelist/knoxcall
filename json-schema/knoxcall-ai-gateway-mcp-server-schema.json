@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/api-evangelist/knoxcall/main/json-schema/knoxcall-ai-gateway-mcp-server-schema.json",
+  "title": "AiGatewayMcpServer",
+  "description": "An MCP server KnoxCall proxies and governs. `connect_url` and `resource`\nare deliberately different values — see their descriptions.\n",
+  "x-generated": "2026-10-18",
+  "x-method": "derived",
+  "x-generator": "derive-json-schema.py",
+  "x-source": "openapi/knoxcall-openapi.json#/components/schemas/AiGatewayMcpServer",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "gateway_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Lowercase machine handle; the last segment of `connect_url`."
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "server_type": {
+      "type": "string",
+      "enum": [
+        "upstream",
+        "collection"
+      ],
+      "description": "Only `upstream` can be created today; `collection` is not served yet."
+    },
+    "transport": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "streamable_http",
+        "sse",
+        null
+      ]
+    },
+    "upstream_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "description": "The upstream MCP endpoint. Always a public `https://` address."
+    },
+    "allowed_tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tool names this server may advertise. EMPTY MEANS IT ADVERTISES NOTHING — a client sees an empty tool list."
+    },
+    "pii_inspection": {
+      "type": "boolean",
+      "description": "Inspect tool arguments and results for PII."
+    },
+    "pii_redact_policy_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "The tenant PII policy whose recognizers apply to this server's tool arguments and results (AIGW-151). Null means every enabled recognizer this tenant owns, on top of the shipped built-ins. Before AIGW-151 the MCP plane used one built-in-only detector stack built at boot, so no tenant recognizer ever applied to tool traffic."
+    },
+    "firewall_policy_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Prompt-injection firewall policy applied to this server's tool traffic."
+    },
+    "guardrail_webhook_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "description": "The tenant's own external scanner (AIGW-150). https only, no embedded credentials, and the destination is SSRF-checked at write time and again on every call. Unlike `/v1/ai` there is no streaming carve-out — the MCP transport materialises every JSON-RPC message, so both directions are always inspectable."
+    },
+    "guardrail_webhook_secret_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "KnoxCall secret holding the HMAC key deliveries are signed with."
+    },
+    "guardrail_webhook_mode": {
+      "type": "string",
+      "enum": [
+        "off",
+        "request",
+        "response",
+        "both"
+      ],
+      "description": "Which directions are offered to the scanner. `request` sees the tool ARGUMENTS after PII redaction and before they leave; `response` sees the tool RESULT after redaction and before it is returned. A `block` verdict refuses the call."
+    },
+    "guardrail_webhook_timeout_ms": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 10000
+    },
+    "guardrail_webhook_failure_action": {
+      "type": "string",
+      "enum": [
+        "fail_open",
+        "fail_closed"
+      ],
+      "description": "What happens when the scanner cannot be reached or does not answer."
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Upstream auth. Only `{ headers, environment_name }` is supported, and every header value must reference a KnoxCall secret, so this object never contains a credential."
+    },
+    "sandbox": {
+      "type": "boolean",
+      "description": "Which Live/Test space this server lives in (AIGW-152). READ-ONLY: it is taken from the mode of the request that created the server (a test API key on the sandbox host makes a Test server) and cannot be set or changed through the API, for the same reason the mode is never a request field anywhere else — a body that could choose it would let a Test caller create a Live server whose `auth` reference resolves a LIVE secret. Reads and writes are confined to the calling key's own space, so a Live key does not see a Test server at all. On the data plane the confinement is the capability token's: a `kp_test_` token against a Live server is a 404. The same slug may exist in both spaces, so an MCP client's configuration does not change between them."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "archived"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "connect_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Where an MCP client points. Served on the tenant data-plane host."
+    },
+    "resource": {
+      "type": "string",
+      "format": "uri",
+      "description": "The RFC 8707 `resource` a token for this server must be bound to. A token bound to a different resource is refused at this server."
+    }
+  }
+}

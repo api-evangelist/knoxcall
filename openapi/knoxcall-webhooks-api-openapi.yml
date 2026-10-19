@@ -1,0 +1,1474 @@
+openapi: 3.2.0
+info:
+  title: KnoxCall Client Management Webhooks API
+  version: '1.0'
+  description: 'The KnoxCall Client Management API provides programmatic access to manage your API gateway
+
+    resources including routes, secrets, clients, environments, webhooks, and API keys. ## Authentication
+
+
+    All requests must include an OAuth 2.1 access token **or** a legacy API key. The
+
+    recommended path for new integrations is the first-party SDKs, which mint, cache, and
+
+    refresh OAuth tokens for you (start with `knoxcall login` on a developer machine, or
+
+    `KNOXCALL_CLIENT_ID` / `KNOXCALL_CLIENT_SECRET` in CI). You can authenticate using any of:
+
+
+    - **Authorization header (OAuth 2.1 bearer token — recommended)**: `Authorization: Bearer `
+
+    - **Authorization header (legacy API key)**: `Authorization: Bearer tk_xxx_yyy`
+
+    - **x-api-key header (legacy API key)**: `x-api-key: tk_xxx_yyy`
+
+
+    OAuth 2.1 access tokens (`kc_` prefix) are minted at the root-host token endpoint
+
+    `https://api.knoxcall.com/oauth/token` (not under `/v1`) using the `client_credentials`
+
+    or `authorization_code` grant. See the `OAuth2` security scheme and the `/oauth/*`
+
+    endpoints. Some resources that are managed exclusively through OAuth reject API-key auth
+
+    with a `403 use_oauth` error. Long-lived API keys remain fully supported. They come in three types:
+
+    - **Standard keys** (`tk_` prefix) are used on the production API (`api.knoxcall.com`). - **Test keys** (`tk_` prefix, type=test) are used on the sandbox API (`sandbox.knoxcall.com`). - **Enterprise Access Keys** (`AKE` prefix) follow the format `AKE[16chars]:[40chars]`. Using a test key on the production API (or vice versa) will return a `403 wrong_key_type` error. ## Request IDs
+
+
+    Every response — success or error — includes an `X-Request-Id` response header (a UUID). Its value is identical to the `request_id` field in the response body (`meta.request_id`
+
+    on success, `error.request_id` on error). Quote it when contacting support. ## API Versioning
+
+
+    The API is versioned on two axes:
+
+
+    - **Major version — the `/v1` path prefix.** Breaking changes ship under a new major
+
+    (`/v2`). `/v1` never receives a breaking change. - **Minor version — the `KnoxCall-Version` header (dated, `YYYY-MM-DD`).** Send
+
+    `KnoxCall-Version: 2026-08-05` to pin the behaviour of a specific dated release. Omit
+
+    the header to get the newest minor version. Every response echoes the resolved version
+
+    back in a `KnoxCall-Version` response header. Within a major version, **additive changes are not breaking** and may appear without a new
+
+    dated version: new endpoints, new optional request fields, new response fields, new
+
+    `error.type` values, and new enum members. Clients must tolerate unknown response fields
+
+    and unknown `error.type` values (see the `ErrorResponse` schema). An **unknown or malformed** `KnoxCall-Version` value returns `400` with
+
+    `error.type: invalid_api_version`. ## Rate Limiting
+
+
+    API keys can have optional rate limits configured. When a limit is configured, the
+
+    following headers are emitted on **every** response (not only `429`s):
+
+    - `X-RateLimit-Limit` -- maximum requests allowed per window
+
+    - `X-RateLimit-Remaining` -- remaining requests in the current window
+
+    - `X-RateLimit-Reset` -- epoch seconds at which the window resets
+
+
+    When the limit is exceeded the API returns `429` (`rate_limit_exceeded` / `rate_limited`)
+
+    and additionally sets `Retry-After` (seconds until the window resets). ## DPoP sender-constrained tokens, and the server nonce
+
+
+    A token minted with a `cnf.jkt` binding (DPoP, RFC 9449) requires a `DPoP` proof header
+
+    on every request, signed over the request''s method and canonical public URL. **Every response to a request that carried a `DPoP` header also carries a
+
+    `DPoP-Nonce` response header** -- mints, refusals and successful calls alike, on
+
+    `POST /oauth/token`, `/v1`, the tenant data plane, the self-hosted proxy and the AI
+
+    gateway. The value is stateless and changes every minute; the server accepts the current
+
+    and the previous minute''s, so a nonce is good for 60-120 seconds.'
+  contact:
+    name: KnoxCall Support
+    url: https://knoxcall.com
+    email: support@knoxcall.com
+  license:
+    name: Proprietary
+    url: https://knoxcall.com/terms
+servers:
+- url: https://api.knoxcall.com/v1
+  description: Production
+- url: https://sandbox.knoxcall.com/v1
+  description: Sandbox (test keys only)
+security:
+- OAuth2: []
+- BearerAuth: []
+- ApiKeyAuth: []
+tags:
+- name: Webhooks
+  description: Manage webhook subscriptions for real-time event notifications.
+paths:
+  /webhooks:
+    get:
+      operationId: listWebhooks
+      summary: List webhooks
+      description: Returns a paginated list of webhook subscriptions.
+      tags:
+      - Webhooks
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+          - created_at
+          - name
+          - enabled
+          default: created_at
+        description: Field to sort by.
+      - $ref: '#/components/parameters/OrderParam'
+      responses:
+        '200':
+          description: A paginated list of webhooks.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookSummary'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createWebhook
+      summary: Create a webhook
+      description: 'Creates a new webhook subscription. The response includes a `secret_key` for
+
+        verifying webhook signatures -- this value is only returned on creation and
+
+        cannot be retrieved again.'
+      tags:
+      - Webhooks
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWebhookRequest'
+            example:
+              name: Error Alerts
+              url: https://hooks.example.com/knoxcall
+              event_types:
+              - request.error
+              - request.server_error
+              method: POST
+              auth_type: none
+              retry_on_failure: true
+              max_retries: 3
+      responses:
+        '200':
+          description: The created webhook, including the signing secret.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WebhookCreated'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/RequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReuse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /webhooks/{id}:
+    parameters:
+    - $ref: '#/components/parameters/WebhookId'
+    get:
+      operationId: getWebhook
+      summary: Get webhook details
+      description: Returns full details of a single webhook subscription, including delivery statistics and configuration.
+      tags:
+      - Webhooks
+      responses:
+        '200':
+          description: Webhook details.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WebhookDetail'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateWebhook
+      summary: Update a webhook
+      description: Updates one or more fields on an existing webhook. Only provided fields are changed.
+      tags:
+      - Webhooks
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWebhookRequest'
+            example:
+              enabled: false
+              event_types:
+              - request.error
+      responses:
+        '200':
+          description: The updated webhook.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WebhookUpdated'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/RequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReuse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteWebhook
+      summary: Delete a webhook
+      description: Permanently deletes a webhook subscription and all of its delivery logs.
+      tags:
+      - Webhooks
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyParam'
+      responses:
+        '200':
+          description: Webhook deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/RequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReuse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /webhooks/{id}/logs:
+    parameters:
+    - $ref: '#/components/parameters/WebhookId'
+    get:
+      operationId: getWebhookLogs
+      summary: Get webhook delivery logs
+      description: Returns a paginated list of delivery attempt logs for the specified webhook, ordered by execution time descending.
+      tags:
+      - Webhooks
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of delivery logs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WebhookLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /webhooks/event-types:
+    get:
+      operationId: listWebhookEventTypes
+      summary: List webhook event types
+      description: Returns the catalog of event types that webhooks can subscribe to.
+      tags:
+      - Webhooks
+      responses:
+        '200':
+          description: Available event types.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      event_types:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            value:
+                              type: string
+                              enum:
+                              - request.received
+                              - request.success
+                              - request.redirect
+                              - request.client_error
+                              - request.server_error
+                              - request.timeout
+                              - request.error
+                              - request.completed
+                              - audit.event
+                            label:
+                              type: string
+                              example: Request errored
+                            description:
+                              type: string
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /webhooks/{id}/test:
+    parameters:
+    - $ref: '#/components/parameters/WebhookId'
+    post:
+      operationId: testWebhook
+      summary: Send a test delivery
+      description: 'Dispatches a synthetic test event to the webhook''s URL using its real
+
+        configuration (auth, signing, headers) and reports delivery status and
+
+        latency. The test payload carries `test: true`.'
+      tags:
+      - Webhooks
+      responses:
+        '200':
+          description: Test delivery result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      status:
+                        type: integer
+                        description: HTTP status returned by the endpoint. Omitted when the delivery failed before a response.
+                        example: 200
+                      response_time_ms:
+                        type: integer
+                        example: 245
+                      error:
+                        type: string
+                        description: Error message. Omitted on success.
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  schemas:
+    WebhookUpdated:
+      type: object
+      description: Webhook update response (no secret or delivery-stat fields).
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        url:
+          type: string
+          format: uri
+        method:
+          type: string
+        event_types:
+          type: array
+          items:
+            type: string
+        auth_type:
+          type: string
+          enum:
+          - none
+          - bearer
+          - basic
+          - header
+          - hmac
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    UpdateWebhookRequest:
+      type: object
+      description: All fields are optional. Only provided fields will be updated.
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+          format: uri
+        method:
+          type: string
+          enum:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+        event_types:
+          type: array
+          items:
+            type: string
+        auth_type:
+          type: string
+          enum:
+          - none
+          - bearer
+          - basic
+          - header
+          - hmac
+        auth_config:
+          type: object
+        request_headers:
+          type: object
+          additionalProperties:
+            type: string
+        route_filter:
+          type: string
+          format: uuid
+        include_request_body:
+          type: boolean
+        include_response_body:
+          type: boolean
+        include_headers:
+          type: boolean
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+        retry_on_failure:
+          type: boolean
+        max_retries:
+          type: integer
+          minimum: 0
+          maximum: 10
+        enabled:
+          type: boolean
+        hmac_key_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        hmac_format:
+          type:
+          - string
+          - 'null'
+          enum:
+          - legacy
+          - stripe
+          - github
+          - slack
+          - aws-sns
+          - custom
+          - null
+        hmac_header_name:
+          type:
+          - string
+          - 'null'
+    WebhookLog:
+      type: object
+      description: A record of a webhook delivery attempt.
+      properties:
+        id:
+          type: string
+          format: uuid
+        http_method:
+          type:
+          - string
+          - 'null'
+          description: HTTP method used to deliver the event to the endpoint.
+          example: POST
+        target_url:
+          type:
+          - string
+          - 'null'
+          description: URL the delivery was sent to.
+          example: https://hooks.example.com/services/T00/B00/xxx
+        source_ip:
+          type:
+          - string
+          - 'null'
+          description: Source IP recorded for the delivery. Not currently populated by any delivery path, so this is always null today.
+          example: null
+        response_status:
+          type:
+          - integer
+          - 'null'
+          description: HTTP status code returned by the webhook endpoint.
+          example: 200
+        response_time_ms:
+          type:
+          - integer
+          - 'null'
+          description: Response time in milliseconds.
+          example: 245
+        executed_at:
+          type: string
+          format: date-time
+          description: When the delivery was attempted.
+          example: '2025-03-15T10:30:01.000Z'
+        success:
+          type: boolean
+          description: Whether the delivery was successful.
+          example: true
+        error_message:
+          type:
+          - string
+          - 'null'
+          description: Error message if delivery failed.
+    WebhookSummary:
+      type: object
+      description: Summary representation of a webhook returned in list responses.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: e1f2a3b4-5c6d-7e8f-9a0b-1c2d3e4f5a6b
+        name:
+          type: string
+          description: Human-readable name for the webhook.
+          example: Error Alerts
+        description:
+          type:
+          - string
+          - 'null'
+          example: Notifies when proxied requests return errors
+        url:
+          type: string
+          format: uri
+          description: Delivery URL.
+          example: https://hooks.example.com/knoxcall
+        method:
+          type: string
+          description: HTTP method used for delivery.
+          example: POST
+        event_types:
+          type: array
+          items:
+            type: string
+          description: List of event types this webhook subscribes to.
+          example:
+          - request.error
+          - request.server_error
+        auth_type:
+          type: string
+          enum:
+          - none
+          - bearer
+          - basic
+          - header
+          - hmac
+          description: Authentication method for webhook delivery.
+          example: none
+        enabled:
+          type: boolean
+          description: Whether the webhook is active.
+          example: true
+        last_triggered_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: When the webhook was last triggered.
+        trigger_count:
+          type: integer
+          description: Total number of times this webhook has been triggered.
+          example: 42
+        success_count:
+          type: integer
+          description: Total number of successful deliveries.
+          example: 40
+        failure_count:
+          type: integer
+          description: Total number of failed deliveries.
+          example: 2
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+    DeletedResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            deleted:
+              type: boolean
+              example: true
+          required:
+          - deleted
+        meta:
+          $ref: '#/components/schemas/RequestMeta'
+      required:
+      - data
+      - meta
+    CreateWebhookRequest:
+      type: object
+      required:
+      - name
+      - url
+      - event_types
+      properties:
+        name:
+          type: string
+          description: Human-readable name for the webhook.
+          example: Error Alerts
+        description:
+          type: string
+          description: Optional description.
+        url:
+          type: string
+          format: uri
+          description: The URL to deliver webhook payloads to.
+          example: https://hooks.example.com/knoxcall
+        method:
+          type: string
+          enum:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          description: HTTP method for delivery.
+          default: POST
+          example: POST
+        event_types:
+          type: array
+          items:
+            type: string
+          description: 'Event types to subscribe to. Must contain at least one event type.
+
+            Valid event types: `request.received`, `request.success`, `request.redirect`,
+
+            `request.client_error`, `request.server_error`, `request.timeout`,
+
+            `request.error`, `request.completed`, `audit.event`. The full catalog
+
+            is available at `GET /webhooks/event-types`.
+
+
+            `audit.event` delivers every audit entry, with sanitised `details`, to
+
+            this URL. Creating a webhook subscribed to it, or making any change to one
+
+            that stays subscribed (including a rename or `enabled: false`), requires
+
+            what reading `details` requires: `audit_log:list` for an API key or OAuth
+
+            client, or an Admin or Owner holder for a user-bound token. Otherwise the
+
+            request is refused with `403 forbidden`. An OAuth token narrowed by scope
+
+            must also hold a scope that reads the audit log (`audit-logs:read`), or
+
+            the request is refused with `403 insufficient_scope`. Deleting the
+
+            webhook is not affected.
+
+            '
+          example:
+          - request.error
+          - request.server_error
+        auth_type:
+          type: string
+          enum:
+          - none
+          - bearer
+          - basic
+          - header
+          - hmac
+          description: Authentication method for delivery requests.
+          default: none
+          example: none
+        auth_config:
+          type: object
+          description: 'Authentication configuration. Structure depends on `auth_type`:
+
+            - `bearer`: `{ "token": "..." }`
+
+            - `basic`: `{ "username": "...", "password": "..." }`
+
+            - `header`: `{ "header_name": "...", "header_value": "..." }`
+
+            - `hmac`: `{ "secret": "..." }`
+
+            '
+        request_headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Custom headers to include with delivery requests.
+        route_filter:
+          type: string
+          format: uuid
+          description: Optional route ID to scope events to a single route.
+        include_request_body:
+          type: boolean
+          description: Include the original request body in the payload.
+          default: true
+        include_response_body:
+          type: boolean
+          description: Include the upstream response body in the payload.
+          default: false
+        include_headers:
+          type: boolean
+          description: Include request/response headers in the payload.
+          default: false
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+          description: Delivery timeout in seconds.
+          default: 30
+          example: 30
+        retry_on_failure:
+          type: boolean
+          description: Retry failed deliveries.
+          default: true
+        max_retries:
+          type: integer
+          minimum: 0
+          maximum: 10
+          description: Maximum retry attempts.
+          default: 3
+          example: 3
+        enabled:
+          type: boolean
+          description: Whether the webhook is active on creation.
+          default: true
+        hmac_key_id:
+          type: string
+          format: uuid
+          description: Sign deliveries with this transit (crypto) key instead of the webhook's generated `secret_key`.
+        hmac_format:
+          type: string
+          enum:
+          - legacy
+          - stripe
+          - github
+          - slack
+          - aws-sns
+          - custom
+          description: Wire format for the HMAC signature header.
+        hmac_header_name:
+          type: string
+          description: Header carrying the signature. Required when `hmac_format` is `custom`.
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
+    PaginationMeta:
+      type: object
+      description: Pagination metadata for list endpoints.
+      properties:
+        total:
+          type: integer
+          description: Total number of records matching the query.
+          example: 42
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        per_page:
+          type: integer
+          description: Number of records per page.
+          example: 20
+        total_pages:
+          type: integer
+          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
+          example: 3
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - total
+      - page
+      - per_page
+      - total_pages
+      - request_id
+    RequestMeta:
+      type: object
+      description: Metadata included with every API response.
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    WebhookDetail:
+      type: object
+      description: 'Full webhook object with all configuration fields and delivery statistics. Credential material is never returned: `secret_key`, `auth_config` and `request_headers` are all accepted on create/update and all omitted from this response. `request_headers` is credential material because the dispatcher spreads it into the outbound header map alongside the `auth_config`-derived `Authorization`, so a value stored there is indistinguishable from a destination API key.'
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Error Alerts
+        description:
+          type:
+          - string
+          - 'null'
+        url:
+          type: string
+          format: uri
+          example: https://hooks.example.com/knoxcall
+        method:
+          type: string
+          example: POST
+        event_types:
+          type: array
+          items:
+            type: string
+          example:
+          - request.error
+          - request.server_error
+        auth_type:
+          type: string
+          enum:
+          - none
+          - bearer
+          - basic
+          - header
+          - hmac
+          example: none
+        route_filter:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+            format: uuid
+          description: Optional route IDs to filter events. Only events from these routes trigger the webhook.
+        include_request_body:
+          type: boolean
+          description: Whether to include the original request body in the webhook payload.
+          example: true
+        include_response_body:
+          type: boolean
+          description: Whether to include the upstream response body in the webhook payload.
+          example: false
+        include_headers:
+          type: boolean
+          description: Whether to include request/response headers in the webhook payload.
+          example: false
+        timeout_seconds:
+          type: integer
+          description: Maximum time in seconds to wait for a delivery response.
+          example: 30
+        retry_on_failure:
+          type: boolean
+          description: Whether to retry failed deliveries.
+          example: true
+        max_retries:
+          type: integer
+          description: Maximum number of retry attempts for failed deliveries.
+          example: 3
+        enabled:
+          type: boolean
+          example: true
+        last_triggered_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        last_success_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Timestamp of the last successful delivery.
+        last_failure_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Timestamp of the last failed delivery.
+        trigger_count:
+          type: integer
+          example: 42
+        success_count:
+          type: integer
+          example: 40
+        failure_count:
+          type: integer
+          example: 2
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+    WebhookCreated:
+      type: object
+      description: Webhook creation response, including the one-time signing secret.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Error Alerts
+        description:
+          type:
+          - string
+          - 'null'
+        url:
+          type: string
+          format: uri
+        method:
+          type: string
+          example: POST
+        event_types:
+          type: array
+          items:
+            type: string
+        auth_type:
+          type: string
+          enum:
+          - none
+          - bearer
+          - basic
+          - header
+          - hmac
+        enabled:
+          type: boolean
+        hmac_key_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Transit key used for HMAC signing, if configured.
+        hmac_format:
+          type:
+          - string
+          - 'null'
+          enum:
+          - legacy
+          - stripe
+          - github
+          - slack
+          - aws-sns
+          - custom
+          - null
+        hmac_header_name:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+        secret_key:
+          type: string
+          description: 'HMAC signing secret for verifying webhook payloads. **This is only
+
+            returned on creation and cannot be retrieved again.** Store it securely.
+
+            '
+          example: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2
+  parameters:
+    OrderParam:
+      name: order
+      in: query
+      schema:
+        type: string
+        enum:
+        - asc
+        - desc
+        default: desc
+      description: Sort direction.
+    PerPageParam:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page (max 100).
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
+    IdempotencyKeyParam:
+      name: X-Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+      description: 'Optional idempotency key so a retried mutating request is executed at most once.
+
+        The standard `Idempotency-Key` spelling is also accepted. Replaying a completed
+
+        request with the same key returns the original stored response with an
+
+        `X-Idempotent-Replay: true` header. A key still in progress returns
+
+        `409 request_in_progress`; the same key with a different body returns
+
+        `422 idempotency_key_reuse`; a malformed key returns `400 invalid_idempotency_key`.
+
+        '
+      example: 3f6c9b2e-1a4d-4c8e-9b0a-7d2e5f1c3a8b
+    WebhookId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The webhook UUID.
+      example: e1f2a3b4-5c6d-7e8f-9a0b-1c2d3e4f5a6b
+  headers:
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+    X-RateLimit-Reset:
+      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
+
+        response whenever a rate limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1735689600
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+    X-RateLimit-Remaining:
+      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 999
+    Retry-After:
+      description: Seconds to wait before retrying. Set on `429` responses.
+      schema:
+        type: integer
+      example: 30
+    X-RateLimit-Limit:
+      description: 'Maximum requests allowed per window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1000
+  responses:
+    RateLimited:
+      description: 'Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
+
+        also present on non-429 responses whenever a limit is configured.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: rate_limit_exceeded
+              message: API rate limit exceeded. Please retry later.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    Forbidden:
+      description: 'The key is authenticated but not authorized for this action (missing scope), a plan
+
+        limit was reached, or the resource must be managed via OAuth (`use_oauth`) / is a
+
+        protected system client (`system_client_protected`).
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              summary: Missing scope
+              value:
+                error:
+                  type: forbidden
+                  message: This key is not authorized to list AI gateways.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            use_oauth:
+              summary: Resource is OAuth-only
+              value:
+                error:
+                  type: use_oauth
+                  message: This resource must be managed with an OAuth 2.1 access token.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            system_client_protected:
+              summary: Protected system client
+              value:
+                error:
+                  type: system_client_protected
+                  message: This client is managed by the platform and cannot be modified.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    RequestInProgress:
+      description: 'A request with the same idempotency key is still being processed. Retry after a
+
+        short delay; do not change the request body.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: request_in_progress
+              message: A request with this idempotency key is already in progress.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    InternalError:
+      description: An unexpected server error occurred.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: internal_error
+              message: An unexpected error occurred.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    IdempotencyKeyReuse:
+      description: 'The supplied idempotency key was already used for a request with a different body.
+
+        Idempotency keys may only be reused with an identical request.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: idempotency_key_reuse
+              message: This idempotency key was already used with a different request body.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    Unauthorized:
+      description: Authentication is required or the provided API key is invalid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_key:
+              summary: No API key provided
+              value:
+                error:
+                  type: authentication_required
+                  message: 'API key is required. Use Authorization: Bearer <api_key> or x-api-key header.'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_key:
+              summary: Invalid API key
+              value:
+                error:
+                  type: invalid_api_key
+                  message: Invalid API key.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: 'OAuth 2.1 authentication — recommended for new integrations. Access tokens
+
+        (`kc_` prefix) are minted at the root-host token endpoint
+
+        `https://api.knoxcall.com/oauth/token` and passed as `Authorization: Bearer <access_token>`.
+
+        Public clients must use PKCE with the `authorization_code` grant; confidential
+
+        clients may use `client_credentials`. The first-party SDKs and the
+
+        `knoxcall login` CLI handle token minting, caching, refresh, and DPoP for you.
+
+        '
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+        authorizationCode:
+          authorizationUrl: https://api.knoxcall.com/oauth/authorize
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+    PhantomToken:
+      type: http
+      scheme: bearer
+      description: "The AI **data plane** credential — a `kp_`-prefixed capability token, not a\nManagement API credential. It is minted per agent (or per MCP resource) at\n`POST /v1/ai-gateway/agents/{agentId}/tokens`, or exchanged from a CI workload's\nOIDC token at `POST /v1/oauth/token`, and it is the ONLY credential `/v1/ai/*`\naccepts: an OAuth `kc_` access token or a `tk_` API key is refused there, and a\n`kp_` token is refused on `api.knoxcall.com`.\n\nThree header spellings are accepted, so an existing provider SDK can be pointed at\nthe agent URL without rewriting its auth:\n\n    Authorization: Bearer kp_live_a_...\n    x-api-key: kp_live_a_...\n    x-knox-ai-key: kp_live_a_...\n\n`kp_live_` is refused on the sandbox host and `kp_test_` on the Live host — the env\nsegment is enforced, not cosmetic. DPoP-bound tokens additionally require a valid\n`DPoP` proof header on every request, signed over the canonical public URL rather\nthan a rewritten `Host`.\n\nA rejected credential answers `401`/`403` in the data-plane error envelope with the\ncause in `code` and in the `X-Auth-Failure` response header.\n"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Legacy long-lived API key authentication via the Authorization header.
+
+        Pass your API key as: `Authorization: Bearer tk_xxx_yyy`.
+
+
+        Standard keys (`tk_` prefix) are accepted on `api.knoxcall.com`.
+
+        Test keys (type=test) are accepted on `sandbox.knoxcall.com`.
+
+        Enterprise Access Keys (`AKE` prefix) are accepted on both.
+
+
+        Fully supported, but prefer the `OAuth2` scheme (or the SDKs, which handle
+
+        OAuth for you) for new integrations.
+
+        '
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: 'Legacy API key authentication via the `x-api-key` header.
+
+        This is an alternative to Bearer token authentication for clients that cannot
+
+        set the `Authorization` header. Prefer the `OAuth2` scheme for new integrations.
+
+        '
+    CapabilityTokenAuth:
+      type: http
+      scheme: bearer
+      description: 'Single-use client capability token (`kct_` prefix), passed as
+
+        `Authorization: Bearer kct_...`. Minted server-side via
+
+        `POST /client-tokens` and bound either to one exact payload + action
+
+        (`decrypt`, `detokenize`) or to one vault + a closed set of page
+
+        origins (`tokenize`). This is NOT an API key — it authenticates only
+
+        the `POST /client/decrypt`, `POST /client/detokenize` and
+
+        `POST /client/tokenize` consume endpoints and is invalidated after its
+
+        first use.
+
+        '

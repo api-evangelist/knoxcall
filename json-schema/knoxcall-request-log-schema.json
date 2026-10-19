@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/api-evangelist/knoxcall/main/json-schema/knoxcall-request-log-schema.json",
+  "title": "RequestLog",
+  "description": "A record of a proxied API request.\n\nOn `GET /logs` the fields `id`, `request_id`, `tenant_id`, `route_id`,\n`matched_client_id`, `identification_method`, `method`, `status_code`,\n`src_ip`, `environment`, `sandbox` and `ts` are exactly what the Merkle\nanchor commits to, in that order - see `GET /logs/{request_id}/proof`.\nEvery other field is operational detail and is NOT part of the leaf.\n",
+  "x-generated": "2026-10-18",
+  "x-method": "derived",
+  "x-generator": "derive-json-schema.py",
+  "x-source": "openapi/knoxcall-openapi.json#/components/schemas/RequestLog",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Row id as a decimal string. This is `api_requests.id`, a bigint - NOT a uuid, which earlier revisions of this schema incorrectly declared. It is a string rather than a JSON number because a JSON number is a double and cannot hold a bigint exactly past 2^53."
+    },
+    "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Correlation ID for the proxied request."
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the request."
+    },
+    "src_ip": {
+      "type": "string",
+      "description": "Source IP address of the caller, host form without a prefix length. Identity tier on `GET /logs`: requires `log:read_identity`, and is ABSENT (not null) when denied."
+    },
+    "method": {
+      "type": "string",
+      "description": "HTTP method used."
+    },
+    "path": {
+      "type": "string",
+      "description": "Request path."
+    },
+    "status_code": {
+      "type": "integer",
+      "description": "HTTP status code returned by the upstream."
+    },
+    "latency_ms": {
+      "type": "integer",
+      "description": "Round-trip latency in milliseconds."
+    },
+    "upstream_host": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Upstream host the request was forwarded to."
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Error message if the request failed."
+    },
+    "environment": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Environment the request was resolved against."
+    },
+    "rate_limited": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Whether this request was rate-limited."
+    },
+    "signature_valid": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Whether the request signature was valid (if required)."
+    },
+    "source_ip_country": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Country of the source IP (GeoIP lookup)."
+    },
+    "source_ip_city": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "City of the source IP (GeoIP lookup)."
+    },
+    "tenant_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Owning tenant. Returned by `GET /logs`; omitted by `GET /routes/{id}/logs`."
+    },
+    "route_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "matched_client_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "Which client the request was attributed to. Kept when that client is later deleted, so it may name a client that no longer exists: it is a committed field of the row's Merkle leaf and is never rewritten. Identity tier on `GET /logs`: requires `log:read_identity`, and is ABSENT (not null) when denied."
+    },
+    "identification_method": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "How that attribution was made (e.g. `ip`, `mtls_thumbprint`). Identity tier on `GET /logs`."
+    },
+    "sandbox": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Live/Test partition. `null` on rows written before the partition existed, which are treated as Live. Null, false and true are three distinct facts and the Merkle anchor keeps them apart."
+    },
+    "proxy_mode": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Opaque resume token, returned by `GET /logs` only. Pass the last row's value as `cursor` on the next call."
+    },
+    "client_origin": {
+      "type": "string",
+      "enum": [
+        "direct",
+        "sdk_intercept"
+      ],
+      "description": "How the call arrived at the Route. `sdk_intercept`: a KnoxCall SDK's route-aware interceptor rerouted a third-party SDK's request onto the Route (the SDK sent `x-knoxcall-origin: sdk-intercept`). `direct`: a plain `call()` / bound-route request, and every row written before the marker existed. Informational only - it never influences authentication, routing, rate limits or the response block."
+    }
+  }
+}

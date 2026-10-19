@@ -1,0 +1,1715 @@
+{
+  "@context": {
+    "@vocab": "https://knoxcall.com/schema#",
+    "schema": "https://schema.org/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "dcterms": "http://purl.org/dc/terms/",
+    "knoxcall": "https://knoxcall.com/schema#",
+    "RequestMeta": "knoxcall:RequestMeta",
+    "request_id": {
+      "@id": "knoxcall:request_id",
+      "@type": "xsd:string"
+    },
+    "PaginationMeta": "knoxcall:PaginationMeta",
+    "total": {
+      "@id": "knoxcall:total",
+      "@type": "xsd:integer"
+    },
+    "page": {
+      "@id": "knoxcall:page",
+      "@type": "xsd:integer"
+    },
+    "per_page": {
+      "@id": "knoxcall:per_page",
+      "@type": "xsd:integer"
+    },
+    "total_pages": {
+      "@id": "knoxcall:total_pages",
+      "@type": "xsd:integer"
+    },
+    "ErrorResponse": "knoxcall:ErrorResponse",
+    "error": {
+      "@id": "knoxcall:error"
+    },
+    "DeletedResponse": "knoxcall:DeletedResponse",
+    "data": {
+      "@id": "knoxcall:data"
+    },
+    "meta": {
+      "@id": "knoxcall:meta",
+      "@type": "@id"
+    },
+    "EgressObservation": "knoxcall:EgressObservation",
+    "host": {
+      "@id": "knoxcall:host",
+      "@type": "xsd:string"
+    },
+    "first_segment": {
+      "@id": "knoxcall:first_segment",
+      "@type": "xsd:string"
+    },
+    "method": {
+      "@id": "knoxcall:method",
+      "@type": "xsd:string"
+    },
+    "header_name": {
+      "@id": "knoxcall:header_name",
+      "@type": "xsd:string"
+    },
+    "count": {
+      "@id": "knoxcall:count",
+      "@type": "xsd:integer"
+    },
+    "first_seen": {
+      "@id": "knoxcall:first_seen",
+      "@type": "xsd:dateTime"
+    },
+    "last_seen": {
+      "@id": "knoxcall:last_seen",
+      "@type": "xsd:dateTime"
+    },
+    "EgressObservationBatch": "knoxcall:EgressObservationBatch",
+    "sdk": {
+      "@id": "knoxcall:sdk",
+      "@type": "xsd:string"
+    },
+    "observations": {
+      "@id": "knoxcall:observations",
+      "@container": "@list"
+    },
+    "EgressObservationReceipt": "knoxcall:EgressObservationReceipt",
+    "accepted": {
+      "@id": "knoxcall:accepted",
+      "@type": "xsd:integer"
+    },
+    "dropped": {
+      "@id": "knoxcall:dropped",
+      "@type": "xsd:integer"
+    },
+    "reasons": {
+      "@id": "knoxcall:reasons"
+    },
+    "redacted": {
+      "@id": "knoxcall:redacted"
+    },
+    "InterceptManifest": "knoxcall:InterceptManifest",
+    "version": {
+      "@id": "knoxcall:version",
+      "@type": "xsd:string"
+    },
+    "ttl_seconds": {
+      "@id": "knoxcall:ttl_seconds",
+      "@type": "xsd:integer"
+    },
+    "environment": {
+      "@id": "knoxcall:environment",
+      "@type": "xsd:string"
+    },
+    "sandbox": {
+      "@id": "knoxcall:sandbox",
+      "@type": "xsd:boolean"
+    },
+    "routes": {
+      "@id": "knoxcall:routes",
+      "@container": "@list"
+    },
+    "RouteSummary": "knoxcall:RouteSummary",
+    "id": {
+      "@id": "knoxcall:id",
+      "@type": "xsd:string"
+    },
+    "name": {
+      "@id": "knoxcall:name",
+      "@type": "xsd:string"
+    },
+    "slug": {
+      "@id": "knoxcall:slug",
+      "@type": "xsd:string"
+    },
+    "target_base_url": {
+      "@id": "knoxcall:target_base_url",
+      "@type": "@id"
+    },
+    "base_environment": {
+      "@id": "knoxcall:base_environment",
+      "@type": "xsd:string"
+    },
+    "enabled": {
+      "@id": "knoxcall:enabled",
+      "@type": "xsd:boolean"
+    },
+    "require_signature": {
+      "@id": "knoxcall:require_signature",
+      "@type": "xsd:boolean"
+    },
+    "rate_limit_enabled": {
+      "@id": "knoxcall:rate_limit_enabled",
+      "@type": "xsd:boolean"
+    },
+    "rate_limit_requests": {
+      "@id": "knoxcall:rate_limit_requests",
+      "@type": "xsd:integer"
+    },
+    "rate_limit_window_sec": {
+      "@id": "knoxcall:rate_limit_window_sec",
+      "@type": "xsd:integer"
+    },
+    "allowed_methods": {
+      "@id": "knoxcall:allowed_methods",
+      "@container": "@list"
+    },
+    "intercept_enabled": {
+      "@id": "knoxcall:intercept_enabled",
+      "@type": "xsd:boolean"
+    },
+    "requires_clients": {
+      "@id": "knoxcall:requires_clients",
+      "@type": "xsd:boolean"
+    },
+    "collection_id": {
+      "@id": "knoxcall:collection_id",
+      "@type": "xsd:string"
+    },
+    "created_at": {
+      "@id": "knoxcall:created_at",
+      "@type": "xsd:dateTime"
+    },
+    "environment_override_count": {
+      "@id": "knoxcall:environment_override_count",
+      "@type": "xsd:integer"
+    },
+    "Route": "knoxcall:Route",
+    "tenant_id": {
+      "@id": "knoxcall:tenant_id",
+      "@type": "xsd:string"
+    },
+    "mtls_certificate_id": {
+      "@id": "knoxcall:mtls_certificate_id",
+      "@type": "xsd:string"
+    },
+    "egress_server_id": {
+      "@id": "knoxcall:egress_server_id",
+      "@type": "xsd:string"
+    },
+    "favicon_url": {
+      "@id": "knoxcall:favicon_url",
+      "@type": "xsd:string"
+    },
+    "favicon_updated_at": {
+      "@id": "knoxcall:favicon_updated_at",
+      "@type": "xsd:dateTime"
+    },
+    "favicon_data": {
+      "@id": "knoxcall:favicon_data",
+      "@type": "xsd:string"
+    },
+    "RouteDetail": "knoxcall:RouteDetail",
+    "configured_environments": {
+      "@id": "knoxcall:configured_environments",
+      "@container": "@list"
+    },
+    "payload_structure": {
+      "@id": "knoxcall:payload_structure"
+    },
+    "injection_rules": {
+      "@id": "knoxcall:injection_rules",
+      "@container": "@list"
+    },
+    "ip_allowlist": {
+      "@id": "knoxcall:ip_allowlist",
+      "@container": "@list"
+    },
+    "data_plane_node_id": {
+      "@id": "knoxcall:data_plane_node_id",
+      "@type": "xsd:string"
+    },
+    "CreateRouteRequest": "knoxcall:CreateRouteRequest",
+    "inject_headers_json": {
+      "@id": "knoxcall:inject_headers_json"
+    },
+    "inject_body_json": {
+      "@id": "knoxcall:inject_body_json"
+    },
+    "method_configs": {
+      "@id": "knoxcall:method_configs"
+    },
+    "UpdateRouteRequest": "knoxcall:UpdateRouteRequest",
+    "signature_tolerance_sec": {
+      "@id": "knoxcall:signature_tolerance_sec",
+      "@type": "xsd:integer"
+    },
+    "rate_limit_burst": {
+      "@id": "knoxcall:rate_limit_burst",
+      "@type": "xsd:integer"
+    },
+    "http_method_restrictions_enabled": {
+      "@id": "knoxcall:http_method_restrictions_enabled",
+      "@type": "xsd:boolean"
+    },
+    "RouteEnvironmentConfig": "knoxcall:RouteEnvironmentConfig",
+    "environment_name": {
+      "@id": "knoxcall:environment_name",
+      "@type": "xsd:string"
+    },
+    "RouteEnvironmentConfigInput": "knoxcall:RouteEnvironmentConfigInput",
+    "RequestLog": "knoxcall:RequestLog",
+    "ts": {
+      "@id": "knoxcall:ts",
+      "@type": "xsd:dateTime"
+    },
+    "src_ip": {
+      "@id": "knoxcall:src_ip",
+      "@type": "xsd:string"
+    },
+    "path": {
+      "@id": "knoxcall:path",
+      "@type": "xsd:string"
+    },
+    "status_code": {
+      "@id": "knoxcall:status_code",
+      "@type": "xsd:integer"
+    },
+    "latency_ms": {
+      "@id": "knoxcall:latency_ms",
+      "@type": "xsd:integer"
+    },
+    "upstream_host": {
+      "@id": "knoxcall:upstream_host",
+      "@type": "xsd:string"
+    },
+    "rate_limited": {
+      "@id": "knoxcall:rate_limited",
+      "@type": "xsd:boolean"
+    },
+    "signature_valid": {
+      "@id": "knoxcall:signature_valid",
+      "@type": "xsd:boolean"
+    },
+    "source_ip_country": {
+      "@id": "knoxcall:source_ip_country",
+      "@type": "xsd:string"
+    },
+    "source_ip_city": {
+      "@id": "knoxcall:source_ip_city",
+      "@type": "xsd:string"
+    },
+    "route_id": {
+      "@id": "knoxcall:route_id",
+      "@type": "xsd:string"
+    },
+    "matched_client_id": {
+      "@id": "knoxcall:matched_client_id",
+      "@type": "xsd:string"
+    },
+    "identification_method": {
+      "@id": "knoxcall:identification_method",
+      "@type": "xsd:string"
+    },
+    "proxy_mode": {
+      "@id": "knoxcall:proxy_mode",
+      "@type": "xsd:string"
+    },
+    "cursor": {
+      "@id": "knoxcall:cursor",
+      "@type": "xsd:string"
+    },
+    "client_origin": {
+      "@id": "knoxcall:client_origin",
+      "@type": "xsd:string"
+    },
+    "Opportunity": "knoxcall:Opportunity",
+    "source": {
+      "@id": "knoxcall:source",
+      "@type": "xsd:string"
+    },
+    "service": {
+      "@id": "knoxcall:service",
+      "@type": "xsd:string"
+    },
+    "destination_host": {
+      "@id": "knoxcall:destination_host",
+      "@type": "xsd:string"
+    },
+    "status": {
+      "@id": "knoxcall:status",
+      "@type": "xsd:string"
+    },
+    "confidence": {
+      "@id": "knoxcall:confidence",
+      "@type": "xsd:decimal"
+    },
+    "suggested_route_json": {
+      "@id": "knoxcall:suggested_route_json"
+    },
+    "evidence_json": {
+      "@id": "knoxcall:evidence_json"
+    },
+    "accepted_route_id": {
+      "@id": "knoxcall:accepted_route_id",
+      "@type": "xsd:string"
+    },
+    "updated_at": {
+      "@id": "knoxcall:updated_at",
+      "@type": "xsd:dateTime"
+    },
+    "acted_at": {
+      "@id": "knoxcall:acted_at",
+      "@type": "xsd:dateTime"
+    },
+    "Secret": "knoxcall:Secret",
+    "shortcode_name": {
+      "@id": "knoxcall:shortcode_name",
+      "@type": "xsd:string"
+    },
+    "secret_type": {
+      "@id": "knoxcall:secret_type",
+      "@type": "xsd:string"
+    },
+    "environment_count": {
+      "@id": "knoxcall:environment_count",
+      "@type": "xsd:integer"
+    },
+    "expires_at": {
+      "@id": "knoxcall:expires_at",
+      "@type": "xsd:dateTime"
+    },
+    "strict_expiry_enforcement": {
+      "@id": "knoxcall:strict_expiry_enforcement",
+      "@type": "xsd:boolean"
+    },
+    "SecretEnvironmentVersion": "knoxcall:SecretEnvironmentVersion",
+    "value_version": {
+      "@id": "knoxcall:value_version",
+      "@type": "xsd:integer"
+    },
+    "expires_at_override": {
+      "@id": "knoxcall:expires_at_override",
+      "@type": "xsd:dateTime"
+    },
+    "OAuth2Token": "knoxcall:OAuth2Token",
+    "access_token": {
+      "@id": "knoxcall:access_token",
+      "@type": "xsd:string"
+    },
+    "token_type": {
+      "@id": "knoxcall:token_type",
+      "@type": "xsd:string"
+    },
+    "connection_status": {
+      "@id": "knoxcall:connection_status",
+      "@type": "xsd:string"
+    },
+    "CreateOAuth2SecretRequest": "knoxcall:CreateOAuth2SecretRequest",
+    "provider": {
+      "@id": "knoxcall:provider",
+      "@type": "xsd:string"
+    },
+    "client_id": {
+      "@id": "knoxcall:client_id",
+      "@type": "xsd:string"
+    },
+    "client_secret": {
+      "@id": "knoxcall:client_secret",
+      "@type": "xsd:string"
+    },
+    "grant_type": {
+      "@id": "knoxcall:grant_type",
+      "@type": "xsd:string"
+    },
+    "scopes": {
+      "@id": "knoxcall:scopes",
+      "@container": "@list"
+    },
+    "auth_url": {
+      "@id": "knoxcall:auth_url",
+      "@type": "@id"
+    },
+    "token_url": {
+      "@id": "knoxcall:token_url",
+      "@type": "@id"
+    },
+    "username": {
+      "@id": "knoxcall:username",
+      "@type": "xsd:string"
+    },
+    "password": {
+      "@id": "knoxcall:password",
+      "@type": "xsd:string"
+    },
+    "OAuth2SecretCreated": "knoxcall:OAuth2SecretCreated",
+    "redirect_uri": {
+      "@id": "knoxcall:redirect_uri",
+      "@type": "@id"
+    },
+    "CreateCertificateSecretRequest": "knoxcall:CreateCertificateSecretRequest",
+    "certificate_content": {
+      "@id": "knoxcall:certificate_content",
+      "@type": "xsd:string"
+    },
+    "private_key": {
+      "@id": "knoxcall:private_key",
+      "@type": "xsd:string"
+    },
+    "passphrase": {
+      "@id": "knoxcall:passphrase",
+      "@type": "xsd:string"
+    },
+    "certificate_type": {
+      "@id": "knoxcall:certificate_type",
+      "@type": "xsd:string"
+    },
+    "CertificateSecretCreated": "knoxcall:CertificateSecretCreated",
+    "metadata": {
+      "@id": "knoxcall:metadata"
+    },
+    "Client": "knoxcall:Client",
+    "type": {
+      "@id": "knoxcall:type",
+      "@type": "xsd:string"
+    },
+    "ip_address": {
+      "@id": "knoxcall:ip_address",
+      "@type": "xsd:string"
+    },
+    "ip_notes": {
+      "@id": "knoxcall:ip_notes"
+    },
+    "description": {
+      "@id": "knoxcall:description",
+      "@type": "xsd:string"
+    },
+    "CreateClientRequest": "knoxcall:CreateClientRequest",
+    "UpdateClientRequest": "knoxcall:UpdateClientRequest",
+    "Environment": "knoxcall:Environment",
+    "display_name": {
+      "@id": "knoxcall:display_name",
+      "@type": "xsd:string"
+    },
+    "color": {
+      "@id": "knoxcall:color",
+      "@type": "xsd:string"
+    },
+    "is_default": {
+      "@id": "knoxcall:is_default",
+      "@type": "xsd:boolean"
+    },
+    "CreateEnvironmentRequest": "knoxcall:CreateEnvironmentRequest",
+    "UpdateEnvironmentRequest": "knoxcall:UpdateEnvironmentRequest",
+    "ApiKey": "knoxcall:ApiKey",
+    "key_id": {
+      "@id": "knoxcall:key_id",
+      "@type": "xsd:string"
+    },
+    "key_prefix": {
+      "@id": "knoxcall:key_prefix",
+      "@type": "xsd:string"
+    },
+    "key_type": {
+      "@id": "knoxcall:key_type",
+      "@type": "xsd:string"
+    },
+    "active": {
+      "@id": "knoxcall:active",
+      "@type": "xsd:boolean"
+    },
+    "last_used_at": {
+      "@id": "knoxcall:last_used_at",
+      "@type": "xsd:dateTime"
+    },
+    "ApiKeyCreated": "knoxcall:ApiKeyCreated",
+    "role_ids": {
+      "@id": "knoxcall:role_ids",
+      "@container": "@list"
+    },
+    "api_key": {
+      "@id": "knoxcall:api_key",
+      "@type": "xsd:string"
+    },
+    "message": {
+      "@id": "knoxcall:message",
+      "@type": "xsd:string"
+    },
+    "CreateApiKeyRequest": "knoxcall:CreateApiKeyRequest",
+    "expires_in_days": {
+      "@id": "knoxcall:expires_in_days",
+      "@type": "xsd:integer"
+    },
+    "never_expires": {
+      "@id": "knoxcall:never_expires",
+      "@type": "xsd:boolean"
+    },
+    "Role": "knoxcall:Role",
+    "applies_to": {
+      "@id": "knoxcall:applies_to",
+      "@container": "@list"
+    },
+    "seeded": {
+      "@id": "knoxcall:seeded",
+      "@type": "xsd:boolean"
+    },
+    "WebhookSummary": "knoxcall:WebhookSummary",
+    "url": {
+      "@id": "knoxcall:url",
+      "@type": "@id"
+    },
+    "event_types": {
+      "@id": "knoxcall:event_types",
+      "@container": "@list"
+    },
+    "auth_type": {
+      "@id": "knoxcall:auth_type",
+      "@type": "xsd:string"
+    },
+    "last_triggered_at": {
+      "@id": "knoxcall:last_triggered_at",
+      "@type": "xsd:dateTime"
+    },
+    "trigger_count": {
+      "@id": "knoxcall:trigger_count",
+      "@type": "xsd:integer"
+    },
+    "success_count": {
+      "@id": "knoxcall:success_count",
+      "@type": "xsd:integer"
+    },
+    "failure_count": {
+      "@id": "knoxcall:failure_count",
+      "@type": "xsd:integer"
+    },
+    "WebhookDetail": "knoxcall:WebhookDetail",
+    "route_filter": {
+      "@id": "knoxcall:route_filter",
+      "@container": "@list"
+    },
+    "include_request_body": {
+      "@id": "knoxcall:include_request_body",
+      "@type": "xsd:boolean"
+    },
+    "include_response_body": {
+      "@id": "knoxcall:include_response_body",
+      "@type": "xsd:boolean"
+    },
+    "include_headers": {
+      "@id": "knoxcall:include_headers",
+      "@type": "xsd:boolean"
+    },
+    "timeout_seconds": {
+      "@id": "knoxcall:timeout_seconds",
+      "@type": "xsd:integer"
+    },
+    "retry_on_failure": {
+      "@id": "knoxcall:retry_on_failure",
+      "@type": "xsd:boolean"
+    },
+    "max_retries": {
+      "@id": "knoxcall:max_retries",
+      "@type": "xsd:integer"
+    },
+    "last_success_at": {
+      "@id": "knoxcall:last_success_at",
+      "@type": "xsd:dateTime"
+    },
+    "last_failure_at": {
+      "@id": "knoxcall:last_failure_at",
+      "@type": "xsd:dateTime"
+    },
+    "WebhookCreated": "knoxcall:WebhookCreated",
+    "hmac_key_id": {
+      "@id": "knoxcall:hmac_key_id",
+      "@type": "xsd:string"
+    },
+    "hmac_format": {
+      "@id": "knoxcall:hmac_format",
+      "@type": "xsd:string"
+    },
+    "hmac_header_name": {
+      "@id": "knoxcall:hmac_header_name",
+      "@type": "xsd:string"
+    },
+    "secret_key": {
+      "@id": "knoxcall:secret_key",
+      "@type": "xsd:string"
+    },
+    "WebhookUpdated": "knoxcall:WebhookUpdated",
+    "CreateWebhookRequest": "knoxcall:CreateWebhookRequest",
+    "auth_config": {
+      "@id": "knoxcall:auth_config"
+    },
+    "request_headers": {
+      "@id": "knoxcall:request_headers"
+    },
+    "UpdateWebhookRequest": "knoxcall:UpdateWebhookRequest",
+    "WebhookLog": "knoxcall:WebhookLog",
+    "http_method": {
+      "@id": "knoxcall:http_method",
+      "@type": "xsd:string"
+    },
+    "target_url": {
+      "@id": "knoxcall:target_url",
+      "@type": "xsd:string"
+    },
+    "source_ip": {
+      "@id": "knoxcall:source_ip",
+      "@type": "xsd:string"
+    },
+    "response_status": {
+      "@id": "knoxcall:response_status",
+      "@type": "xsd:integer"
+    },
+    "response_time_ms": {
+      "@id": "knoxcall:response_time_ms",
+      "@type": "xsd:integer"
+    },
+    "executed_at": {
+      "@id": "knoxcall:executed_at",
+      "@type": "xsd:dateTime"
+    },
+    "success": {
+      "@id": "knoxcall:success",
+      "@type": "xsd:boolean"
+    },
+    "error_message": {
+      "@id": "knoxcall:error_message",
+      "@type": "xsd:string"
+    },
+    "VaultTokenExpiringEventPayload": "knoxcall:VaultTokenExpiringEventPayload",
+    "event": {
+      "@id": "knoxcall:event",
+      "@type": "xsd:string"
+    },
+    "timestamp": {
+      "@id": "knoxcall:timestamp",
+      "@type": "xsd:dateTime"
+    },
+    "WebhookEventPayload": "knoxcall:WebhookEventPayload",
+    "webhook_id": {
+      "@id": "knoxcall:webhook_id",
+      "@type": "xsd:string"
+    },
+    "webhook_name": {
+      "@id": "knoxcall:webhook_name",
+      "@type": "xsd:string"
+    },
+    "test": {
+      "@id": "knoxcall:test",
+      "@type": "xsd:boolean"
+    },
+    "WebhookEventRequest": "knoxcall:WebhookEventRequest",
+    "ip": {
+      "@id": "knoxcall:ip",
+      "@type": "xsd:string"
+    },
+    "headers": {
+      "@id": "knoxcall:headers"
+    },
+    "body": {
+      "@id": "knoxcall:body"
+    },
+    "WebhookEventResponse": "knoxcall:WebhookEventResponse",
+    "Account": "knoxcall:Account",
+    "region": {
+      "@id": "knoxcall:region",
+      "@type": "xsd:string"
+    },
+    "subscription_plan": {
+      "@id": "knoxcall:subscription_plan",
+      "@type": "xsd:string"
+    },
+    "subscription_status": {
+      "@id": "knoxcall:subscription_status",
+      "@type": "xsd:string"
+    },
+    "trial_start_at": {
+      "@id": "knoxcall:trial_start_at",
+      "@type": "xsd:dateTime"
+    },
+    "trial_end_at": {
+      "@id": "knoxcall:trial_end_at",
+      "@type": "xsd:dateTime"
+    },
+    "subscription_current_period_start": {
+      "@id": "knoxcall:subscription_current_period_start",
+      "@type": "xsd:dateTime"
+    },
+    "subscription_current_period_end": {
+      "@id": "knoxcall:subscription_current_period_end",
+      "@type": "xsd:dateTime"
+    },
+    "subscription_cancel_at": {
+      "@id": "knoxcall:subscription_cancel_at",
+      "@type": "xsd:dateTime"
+    },
+    "AccountUsage": "knoxcall:AccountUsage",
+    "billing_period": {
+      "@id": "knoxcall:billing_period"
+    },
+    "api_calls": {
+      "@id": "knoxcall:api_calls"
+    },
+    "resources": {
+      "@id": "knoxcall:resources"
+    },
+    "plan": {
+      "@id": "knoxcall:plan",
+      "@type": "xsd:string"
+    },
+    "ResourceUsage": "knoxcall:ResourceUsage",
+    "used": {
+      "@id": "knoxcall:used",
+      "@type": "xsd:integer"
+    },
+    "limit": {
+      "@id": "knoxcall:limit",
+      "@type": "xsd:integer"
+    },
+    "RequestLogProof": "knoxcall:RequestLogProof",
+    "anchored": {
+      "@id": "knoxcall:anchored",
+      "@type": "xsd:boolean"
+    },
+    "verified": {
+      "@id": "knoxcall:verified",
+      "@type": "xsd:boolean"
+    },
+    "reason": {
+      "@id": "knoxcall:reason",
+      "@type": "xsd:string"
+    },
+    "detail": {
+      "@id": "knoxcall:detail",
+      "@type": "xsd:string"
+    },
+    "observed_leaf_count": {
+      "@id": "knoxcall:observed_leaf_count",
+      "@type": "xsd:integer"
+    },
+    "recomputed_root": {
+      "@id": "knoxcall:recomputed_root",
+      "@type": "xsd:string"
+    },
+    "anchor": {
+      "@id": "knoxcall:anchor"
+    },
+    "leaf_index": {
+      "@id": "knoxcall:leaf_index",
+      "@type": "xsd:integer"
+    },
+    "leaf_hash": {
+      "@id": "knoxcall:leaf_hash",
+      "@type": "xsd:string"
+    },
+    "proof": {
+      "@id": "knoxcall:proof",
+      "@container": "@list"
+    },
+    "verification": {
+      "@id": "knoxcall:verification"
+    },
+    "AuditLog": "knoxcall:AuditLog",
+    "action": {
+      "@id": "knoxcall:action",
+      "@type": "xsd:string"
+    },
+    "resource_type": {
+      "@id": "knoxcall:resource_type",
+      "@type": "xsd:string"
+    },
+    "resource_id": {
+      "@id": "knoxcall:resource_id",
+      "@type": "xsd:string"
+    },
+    "details": {
+      "@id": "knoxcall:details"
+    },
+    "details_redacted": {
+      "@id": "knoxcall:details_redacted",
+      "@type": "xsd:boolean"
+    },
+    "RouteAction": "knoxcall:RouteAction",
+    "direction": {
+      "@id": "knoxcall:direction",
+      "@type": "xsd:string"
+    },
+    "selectors": {
+      "@id": "knoxcall:selectors",
+      "@container": "@list"
+    },
+    "key_name": {
+      "@id": "knoxcall:key_name",
+      "@type": "xsd:string"
+    },
+    "data_role": {
+      "@id": "knoxcall:data_role",
+      "@type": "xsd:string"
+    },
+    "content_type": {
+      "@id": "knoxcall:content_type",
+      "@type": "xsd:string"
+    },
+    "sort_order": {
+      "@id": "knoxcall:sort_order",
+      "@type": "xsd:integer"
+    },
+    "CreateRouteActionRequest": "knoxcall:CreateRouteActionRequest",
+    "ClientCredential": "knoxcall:ClientCredential",
+    "kind": {
+      "@id": "knoxcall:kind",
+      "@type": "xsd:string"
+    },
+    "label": {
+      "@id": "knoxcall:label",
+      "@type": "xsd:string"
+    },
+    "last_matched_at": {
+      "@id": "knoxcall:last_matched_at",
+      "@type": "xsd:dateTime"
+    },
+    "CreateClientCredentialRequest": "knoxcall:CreateClientCredentialRequest",
+    "OAuthClient": "knoxcall:OAuthClient",
+    "grant_types": {
+      "@id": "knoxcall:grant_types",
+      "@container": "@list"
+    },
+    "allowed_scopes": {
+      "@id": "knoxcall:allowed_scopes",
+      "@container": "@list"
+    },
+    "redirect_uris": {
+      "@id": "knoxcall:redirect_uris",
+      "@container": "@list"
+    },
+    "system_role": {
+      "@id": "knoxcall:system_role",
+      "@type": "xsd:string"
+    },
+    "require_dpop": {
+      "@id": "knoxcall:require_dpop",
+      "@type": "xsd:boolean"
+    },
+    "require_pkce": {
+      "@id": "knoxcall:require_pkce",
+      "@type": "xsd:boolean"
+    },
+    "token_format": {
+      "@id": "knoxcall:token_format",
+      "@type": "xsd:string"
+    },
+    "revoked_at": {
+      "@id": "knoxcall:revoked_at",
+      "@type": "xsd:dateTime"
+    },
+    "source_api_key_id": {
+      "@id": "knoxcall:source_api_key_id",
+      "@type": "xsd:string"
+    },
+    "source_key_type": {
+      "@id": "knoxcall:source_key_type",
+      "@type": "xsd:string"
+    },
+    "OAuthClientDetail": "knoxcall:OAuthClientDetail",
+    "step_up_scopes": {
+      "@id": "knoxcall:step_up_scopes",
+      "@container": "@list"
+    },
+    "OAuthClientCreated": "knoxcall:OAuthClientCreated",
+    "CreateOAuthClientRequest": "knoxcall:CreateOAuthClientRequest",
+    "UpdateOAuthClientRequest": "knoxcall:UpdateOAuthClientRequest",
+    "consent_html_template": {
+      "@id": "knoxcall:consent_html_template",
+      "@type": "xsd:string"
+    },
+    "Agent": "knoxcall:Agent",
+    "agent_id": {
+      "@id": "knoxcall:agent_id",
+      "@type": "xsd:string"
+    },
+    "require_verified_build": {
+      "@id": "knoxcall:require_verified_build",
+      "@type": "xsd:boolean"
+    },
+    "last_seen_at": {
+      "@id": "knoxcall:last_seen_at",
+      "@type": "xsd:dateTime"
+    },
+    "last_session_issued_at": {
+      "@id": "knoxcall:last_session_issued_at",
+      "@type": "xsd:dateTime"
+    },
+    "has_tamper_events": {
+      "@id": "knoxcall:has_tamper_events",
+      "@type": "xsd:boolean"
+    },
+    "AgentCreated": "knoxcall:AgentCreated",
+    "agent_secret": {
+      "@id": "knoxcall:agent_secret",
+      "@type": "xsd:string"
+    },
+    "AgentTamperEvent": "knoxcall:AgentTamperEvent",
+    "version_reported": {
+      "@id": "knoxcall:version_reported",
+      "@type": "xsd:string"
+    },
+    "build_sig_reported": {
+      "@id": "knoxcall:build_sig_reported",
+      "@type": "xsd:string"
+    },
+    "action_taken": {
+      "@id": "knoxcall:action_taken",
+      "@type": "xsd:string"
+    },
+    "detected_at": {
+      "@id": "knoxcall:detected_at",
+      "@type": "xsd:dateTime"
+    },
+    "TransitKey": "knoxcall:TransitKey",
+    "mode": {
+      "@id": "knoxcall:mode",
+      "@type": "xsd:string"
+    },
+    "current_version": {
+      "@id": "knoxcall:current_version",
+      "@type": "xsd:integer"
+    },
+    "deletion_allowed": {
+      "@id": "knoxcall:deletion_allowed",
+      "@type": "xsd:boolean"
+    },
+    "created_by": {
+      "@id": "knoxcall:created_by",
+      "@type": "xsd:string"
+    },
+    "CreateTransitKeyRequest": "knoxcall:CreateTransitKeyRequest",
+    "SealingBundle": "knoxcall:SealingBundle",
+    "public_key_raw": {
+      "@id": "knoxcall:public_key_raw",
+      "@type": "xsd:string"
+    },
+    "key_ref": {
+      "@id": "knoxcall:key_ref"
+    },
+    "InspectResult": "knoxcall:InspectResult",
+    "encrypted": {
+      "@id": "knoxcall:encrypted",
+      "@type": "xsd:boolean"
+    },
+    "scheme": {
+      "@id": "knoxcall:scheme",
+      "@type": "xsd:string"
+    },
+    "datatype": {
+      "@id": "knoxcall:datatype",
+      "@type": "xsd:string"
+    },
+    "fingerprint": {
+      "@id": "knoxcall:fingerprint",
+      "@type": "xsd:string"
+    },
+    "CARoot": "knoxcall:CARoot",
+    "cert_pem": {
+      "@id": "knoxcall:cert_pem",
+      "@type": "xsd:string"
+    },
+    "subject": {
+      "@id": "knoxcall:subject",
+      "@type": "xsd:string"
+    },
+    "subject_fields": {
+      "@id": "knoxcall:subject_fields"
+    },
+    "not_before": {
+      "@id": "knoxcall:not_before",
+      "@type": "xsd:dateTime"
+    },
+    "not_after": {
+      "@id": "knoxcall:not_after",
+      "@type": "xsd:dateTime"
+    },
+    "CARole": "knoxcall:CARole",
+    "ca_root_id": {
+      "@id": "knoxcall:ca_root_id",
+      "@type": "xsd:string"
+    },
+    "allowed_domains": {
+      "@id": "knoxcall:allowed_domains",
+      "@container": "@list"
+    },
+    "allow_subdomains": {
+      "@id": "knoxcall:allow_subdomains",
+      "@type": "xsd:boolean"
+    },
+    "allow_wildcards": {
+      "@id": "knoxcall:allow_wildcards",
+      "@type": "xsd:boolean"
+    },
+    "max_ttl_seconds": {
+      "@id": "knoxcall:max_ttl_seconds",
+      "@type": "xsd:integer"
+    },
+    "default_ttl_seconds": {
+      "@id": "knoxcall:default_ttl_seconds",
+      "@type": "xsd:integer"
+    },
+    "key_algorithm": {
+      "@id": "knoxcall:key_algorithm",
+      "@type": "xsd:string"
+    },
+    "IssuedCertificate": "knoxcall:IssuedCertificate",
+    "serial_hex": {
+      "@id": "knoxcall:serial_hex",
+      "@type": "xsd:string"
+    },
+    "private_key_pem": {
+      "@id": "knoxcall:private_key_pem",
+      "@type": "xsd:string"
+    },
+    "ca_chain_pem": {
+      "@id": "knoxcall:ca_chain_pem",
+      "@type": "xsd:string"
+    },
+    "DbConnection": "knoxcall:DbConnection",
+    "engine": {
+      "@id": "knoxcall:engine",
+      "@type": "xsd:string"
+    },
+    "port": {
+      "@id": "knoxcall:port",
+      "@type": "xsd:integer"
+    },
+    "database_name": {
+      "@id": "knoxcall:database_name",
+      "@type": "xsd:string"
+    },
+    "admin_username": {
+      "@id": "knoxcall:admin_username",
+      "@type": "xsd:string"
+    },
+    "execution_mode": {
+      "@id": "knoxcall:execution_mode",
+      "@type": "xsd:string"
+    },
+    "connect_options": {
+      "@id": "knoxcall:connect_options"
+    },
+    "ssh_host": {
+      "@id": "knoxcall:ssh_host",
+      "@type": "xsd:string"
+    },
+    "ssh_port": {
+      "@id": "knoxcall:ssh_port",
+      "@type": "xsd:integer"
+    },
+    "ssh_username": {
+      "@id": "knoxcall:ssh_username",
+      "@type": "xsd:string"
+    },
+    "iam_region": {
+      "@id": "knoxcall:iam_region",
+      "@type": "xsd:string"
+    },
+    "iam_db_user": {
+      "@id": "knoxcall:iam_db_user",
+      "@type": "xsd:string"
+    },
+    "CreateDbConnectionRequest": "knoxcall:CreateDbConnectionRequest",
+    "admin_password": {
+      "@id": "knoxcall:admin_password",
+      "@type": "xsd:string"
+    },
+    "ssh_private_key": {
+      "@id": "knoxcall:ssh_private_key",
+      "@type": "xsd:string"
+    },
+    "ssh_passphrase": {
+      "@id": "knoxcall:ssh_passphrase",
+      "@type": "xsd:string"
+    },
+    "ssh_host_fingerprint": {
+      "@id": "knoxcall:ssh_host_fingerprint",
+      "@type": "xsd:string"
+    },
+    "DbRole": "knoxcall:DbRole",
+    "creation_sql_template": {
+      "@id": "knoxcall:creation_sql_template",
+      "@type": "xsd:string"
+    },
+    "revocation_sql_template": {
+      "@id": "knoxcall:revocation_sql_template",
+      "@type": "xsd:string"
+    },
+    "DbLease": "knoxcall:DbLease",
+    "issued_at": {
+      "@id": "knoxcall:issued_at",
+      "@type": "xsd:dateTime"
+    },
+    "connection_name": {
+      "@id": "knoxcall:connection_name",
+      "@type": "xsd:string"
+    },
+    "role_name": {
+      "@id": "knoxcall:role_name",
+      "@type": "xsd:string"
+    },
+    "MintedDbCredential": "knoxcall:MintedDbCredential",
+    "lease_id": {
+      "@id": "knoxcall:lease_id",
+      "@type": "xsd:integer"
+    },
+    "Vault": "knoxcall:Vault",
+    "crypto_key_id": {
+      "@id": "knoxcall:crypto_key_id",
+      "@type": "xsd:string"
+    },
+    "custody_mode": {
+      "@id": "knoxcall:custody_mode",
+      "@type": "xsd:string"
+    },
+    "metadata_jsonb": {
+      "@id": "knoxcall:metadata_jsonb"
+    },
+    "allowed_destinations": {
+      "@id": "knoxcall:allowed_destinations",
+      "@container": "@list"
+    },
+    "CreateVaultRequest": "knoxcall:CreateVaultRequest",
+    "VaultToken": "knoxcall:VaultToken",
+    "token": {
+      "@id": "knoxcall:token",
+      "@type": "xsd:string"
+    },
+    "created_by_api_key_id": {
+      "@id": "knoxcall:created_by_api_key_id",
+      "@type": "xsd:string"
+    },
+    "created_by_user_id": {
+      "@id": "knoxcall:created_by_user_id",
+      "@type": "xsd:string"
+    },
+    "card_expires_on": {
+      "@id": "knoxcall:card_expires_on",
+      "@type": "xsd:date"
+    },
+    "card_funding_type": {
+      "@id": "knoxcall:card_funding_type",
+      "@type": "xsd:string"
+    },
+    "card_issuing_country": {
+      "@id": "knoxcall:card_issuing_country",
+      "@type": "xsd:string"
+    },
+    "VaultTokenCreated": "knoxcall:VaultTokenCreated",
+    "VaultTokenDetail": "knoxcall:VaultTokenDetail",
+    "value": {
+      "@id": "knoxcall:value",
+      "@type": "xsd:string"
+    },
+    "value_b64": {
+      "@id": "knoxcall:value_b64",
+      "@type": "xsd:string"
+    },
+    "crypto_key_version": {
+      "@id": "knoxcall:crypto_key_version",
+      "@type": "xsd:integer"
+    },
+    "Workflow": "knoxcall:Workflow",
+    "definition": {
+      "@id": "knoxcall:definition"
+    },
+    "published_at": {
+      "@id": "knoxcall:published_at",
+      "@type": "xsd:dateTime"
+    },
+    "run_count": {
+      "@id": "knoxcall:run_count",
+      "@type": "xsd:integer"
+    },
+    "WorkflowExecution": "knoxcall:WorkflowExecution",
+    "workflow_id": {
+      "@id": "knoxcall:workflow_id",
+      "@type": "xsd:string"
+    },
+    "trigger_type": {
+      "@id": "knoxcall:trigger_type",
+      "@type": "xsd:string"
+    },
+    "started_at": {
+      "@id": "knoxcall:started_at",
+      "@type": "xsd:dateTime"
+    },
+    "completed_at": {
+      "@id": "knoxcall:completed_at",
+      "@type": "xsd:dateTime"
+    },
+    "execution_time_ms": {
+      "@id": "knoxcall:execution_time_ms",
+      "@type": "xsd:integer"
+    },
+    "workflow_version": {
+      "@id": "knoxcall:workflow_version",
+      "@type": "xsd:integer"
+    },
+    "node_executions": {
+      "@id": "knoxcall:node_executions",
+      "@container": "@list"
+    },
+    "CreateWorkflowRequest": "knoxcall:CreateWorkflowRequest",
+    "trigger_config": {
+      "@id": "knoxcall:trigger_config"
+    },
+    "AiGateway": "knoxcall:AiGateway",
+    "budget_daily_usd": {
+      "@id": "knoxcall:budget_daily_usd",
+      "@type": "xsd:decimal"
+    },
+    "budget_monthly_usd": {
+      "@id": "knoxcall:budget_monthly_usd",
+      "@type": "xsd:decimal"
+    },
+    "budget_overage_action": {
+      "@id": "knoxcall:budget_overage_action",
+      "@type": "xsd:string"
+    },
+    "paused_reason": {
+      "@id": "knoxcall:paused_reason",
+      "@type": "xsd:string"
+    },
+    "geo_velocity_action": {
+      "@id": "knoxcall:geo_velocity_action",
+      "@type": "xsd:string"
+    },
+    "model_aliases": {
+      "@id": "knoxcall:model_aliases"
+    },
+    "CreateAiGatewayRequest": "knoxcall:CreateAiGatewayRequest",
+    "UpdateAiGatewayRequest": "knoxcall:UpdateAiGatewayRequest",
+    "AiGatewayPiiPolicy": "knoxcall:AiGatewayPiiPolicy",
+    "recognizer_ids": {
+      "@id": "knoxcall:recognizer_ids",
+      "@container": "@list"
+    },
+    "default_action": {
+      "@id": "knoxcall:default_action",
+      "@type": "xsd:string"
+    },
+    "AiGatewayPiiPolicyCreate": "knoxcall:AiGatewayPiiPolicyCreate",
+    "AiGatewayPiiRecognizer": "knoxcall:AiGatewayPiiRecognizer",
+    "pattern": {
+      "@id": "knoxcall:pattern",
+      "@type": "xsd:string"
+    },
+    "context_words": {
+      "@id": "knoxcall:context_words",
+      "@container": "@list"
+    },
+    "format": {
+      "@id": "knoxcall:format",
+      "@type": "xsd:string"
+    },
+    "AiGatewayPiiRecognizerCreate": "knoxcall:AiGatewayPiiRecognizerCreate",
+    "AiGatewayPiiRecognizerUpdate": "knoxcall:AiGatewayPiiRecognizerUpdate",
+    "AiGatewayPiiRecognizerTestResult": "knoxcall:AiGatewayPiiRecognizerTestResult",
+    "matched": {
+      "@id": "knoxcall:matched",
+      "@type": "xsd:boolean"
+    },
+    "matches": {
+      "@id": "knoxcall:matches",
+      "@container": "@list"
+    },
+    "AiGatewayMcpServer": "knoxcall:AiGatewayMcpServer",
+    "gateway_id": {
+      "@id": "knoxcall:gateway_id",
+      "@type": "xsd:string"
+    },
+    "server_type": {
+      "@id": "knoxcall:server_type",
+      "@type": "xsd:string"
+    },
+    "transport": {
+      "@id": "knoxcall:transport",
+      "@type": "xsd:string"
+    },
+    "upstream_url": {
+      "@id": "knoxcall:upstream_url",
+      "@type": "@id"
+    },
+    "allowed_tools": {
+      "@id": "knoxcall:allowed_tools",
+      "@container": "@list"
+    },
+    "pii_inspection": {
+      "@id": "knoxcall:pii_inspection",
+      "@type": "xsd:boolean"
+    },
+    "pii_redact_policy_id": {
+      "@id": "knoxcall:pii_redact_policy_id",
+      "@type": "xsd:string"
+    },
+    "firewall_policy_id": {
+      "@id": "knoxcall:firewall_policy_id",
+      "@type": "xsd:string"
+    },
+    "guardrail_webhook_url": {
+      "@id": "knoxcall:guardrail_webhook_url",
+      "@type": "@id"
+    },
+    "guardrail_webhook_secret_id": {
+      "@id": "knoxcall:guardrail_webhook_secret_id",
+      "@type": "xsd:string"
+    },
+    "guardrail_webhook_mode": {
+      "@id": "knoxcall:guardrail_webhook_mode",
+      "@type": "xsd:string"
+    },
+    "guardrail_webhook_timeout_ms": {
+      "@id": "knoxcall:guardrail_webhook_timeout_ms",
+      "@type": "xsd:integer"
+    },
+    "guardrail_webhook_failure_action": {
+      "@id": "knoxcall:guardrail_webhook_failure_action",
+      "@type": "xsd:string"
+    },
+    "auth": {
+      "@id": "knoxcall:auth"
+    },
+    "connect_url": {
+      "@id": "knoxcall:connect_url",
+      "@type": "@id"
+    },
+    "resource": {
+      "@id": "knoxcall:resource",
+      "@type": "@id"
+    },
+    "CreateAiGatewayMcpServerRequest": "knoxcall:CreateAiGatewayMcpServerRequest",
+    "UpdateAiGatewayMcpServerRequest": "knoxcall:UpdateAiGatewayMcpServerRequest",
+    "AiGatewayMcpAuth": "knoxcall:AiGatewayMcpAuth",
+    "AiGatewayMcpGrant": "knoxcall:AiGatewayMcpGrant",
+    "attributed_user_id": {
+      "@id": "knoxcall:attributed_user_id",
+      "@type": "xsd:string"
+    },
+    "external_id": {
+      "@id": "knoxcall:external_id",
+      "@type": "xsd:string"
+    },
+    "last_refreshed_at": {
+      "@id": "knoxcall:last_refreshed_at",
+      "@type": "xsd:dateTime"
+    },
+    "has_refresh_token": {
+      "@id": "knoxcall:has_refresh_token",
+      "@type": "xsd:boolean"
+    },
+    "AiGatewayMcpTool": "knoxcall:AiGatewayMcpTool",
+    "mcp_server_id": {
+      "@id": "knoxcall:mcp_server_id",
+      "@type": "xsd:string"
+    },
+    "tool_name": {
+      "@id": "knoxcall:tool_name",
+      "@type": "xsd:string"
+    },
+    "input_schema": {
+      "@id": "knoxcall:input_schema"
+    },
+    "UpsertAiGatewayMcpToolRequest": "knoxcall:UpsertAiGatewayMcpToolRequest",
+    "AiGatewayAgent": "knoxcall:AiGatewayAgent",
+    "primary_route_id": {
+      "@id": "knoxcall:primary_route_id",
+      "@type": "xsd:string"
+    },
+    "fallback_route_ids": {
+      "@id": "knoxcall:fallback_route_ids",
+      "@container": "@list"
+    },
+    "model_allowlist": {
+      "@id": "knoxcall:model_allowlist",
+      "@container": "@list"
+    },
+    "model_denylist": {
+      "@id": "knoxcall:model_denylist",
+      "@container": "@list"
+    },
+    "default_model": {
+      "@id": "knoxcall:default_model",
+      "@type": "xsd:string"
+    },
+    "model_rewrite": {
+      "@id": "knoxcall:model_rewrite"
+    },
+    "budget_per_call_max_tokens": {
+      "@id": "knoxcall:budget_per_call_max_tokens",
+      "@type": "xsd:integer"
+    },
+    "fallback_agent_id": {
+      "@id": "knoxcall:fallback_agent_id",
+      "@type": "xsd:string"
+    },
+    "pii_detokenize_response": {
+      "@id": "knoxcall:pii_detokenize_response",
+      "@type": "xsd:boolean"
+    },
+    "pii_request_mode": {
+      "@id": "knoxcall:pii_request_mode",
+      "@type": "xsd:string"
+    },
+    "pii_response_mode": {
+      "@id": "knoxcall:pii_response_mode",
+      "@type": "xsd:string"
+    },
+    "pii_streaming_holdback_chars": {
+      "@id": "knoxcall:pii_streaming_holdback_chars",
+      "@type": "xsd:integer"
+    },
+    "pii_streaming_mode": {
+      "@id": "knoxcall:pii_streaming_mode",
+      "@type": "xsd:string"
+    },
+    "cache_mode": {
+      "@id": "knoxcall:cache_mode",
+      "@type": "xsd:string"
+    },
+    "cache_ttl_seconds": {
+      "@id": "knoxcall:cache_ttl_seconds",
+      "@type": "xsd:integer"
+    },
+    "cache_similarity_threshold": {
+      "@id": "knoxcall:cache_similarity_threshold",
+      "@type": "xsd:decimal"
+    },
+    "cache_embedding_model": {
+      "@id": "knoxcall:cache_embedding_model",
+      "@type": "xsd:string"
+    },
+    "streaming_enabled": {
+      "@id": "knoxcall:streaming_enabled",
+      "@type": "xsd:boolean"
+    },
+    "tool_allowlist": {
+      "@id": "knoxcall:tool_allowlist",
+      "@container": "@list"
+    },
+    "output_schema": {
+      "@id": "knoxcall:output_schema"
+    },
+    "output_validation_action": {
+      "@id": "knoxcall:output_validation_action",
+      "@type": "xsd:string"
+    },
+    "data_residency_region": {
+      "@id": "knoxcall:data_residency_region",
+      "@type": "xsd:string"
+    },
+    "cmek_key_id": {
+      "@id": "knoxcall:cmek_key_id",
+      "@type": "xsd:string"
+    },
+    "tags": {
+      "@id": "knoxcall:tags"
+    },
+    "routing_policy": {
+      "@id": "knoxcall:routing_policy"
+    },
+    "agent_url": {
+      "@id": "knoxcall:agent_url",
+      "@type": "xsd:string"
+    },
+    "CreateAiGatewayAgentRequest": "knoxcall:CreateAiGatewayAgentRequest",
+    "upstream_secret_id": {
+      "@id": "knoxcall:upstream_secret_id",
+      "@type": "xsd:string"
+    },
+    "upstream": {
+      "@id": "knoxcall:upstream",
+      "@type": "xsd:string"
+    },
+    "AiGatewayRoutingPolicy": "knoxcall:AiGatewayRoutingPolicy",
+    "retry_on": {
+      "@id": "knoxcall:retry_on",
+      "@container": "@list"
+    },
+    "max_attempts": {
+      "@id": "knoxcall:max_attempts",
+      "@type": "xsd:integer"
+    },
+    "backoff_ms": {
+      "@id": "knoxcall:backoff_ms",
+      "@type": "xsd:integer"
+    },
+    "backoff_multiplier": {
+      "@id": "knoxcall:backoff_multiplier",
+      "@type": "xsd:decimal"
+    },
+    "max_backoff_ms": {
+      "@id": "knoxcall:max_backoff_ms",
+      "@type": "xsd:integer"
+    },
+    "respect_retry_after": {
+      "@id": "knoxcall:respect_retry_after",
+      "@type": "xsd:boolean"
+    },
+    "max_retry_after_ms": {
+      "@id": "knoxcall:max_retry_after_ms",
+      "@type": "xsd:integer"
+    },
+    "jitter": {
+      "@id": "knoxcall:jitter",
+      "@type": "xsd:boolean"
+    },
+    "route_weights": {
+      "@id": "knoxcall:route_weights"
+    },
+    "UpdateAiGatewayAgentRequest": "knoxcall:UpdateAiGatewayAgentRequest",
+    "AiGatewayPhantomToken": "knoxcall:AiGatewayPhantomToken",
+    "prefix": {
+      "@id": "knoxcall:prefix",
+      "@type": "xsd:string"
+    },
+    "dpop_required": {
+      "@id": "knoxcall:dpop_required",
+      "@type": "xsd:boolean"
+    },
+    "scope_jsonb": {
+      "@id": "knoxcall:scope_jsonb"
+    },
+    "MintAiGatewayTokenRequest": "knoxcall:MintAiGatewayTokenRequest",
+    "dpop_jkt": {
+      "@id": "knoxcall:dpop_jkt",
+      "@type": "xsd:string"
+    },
+    "expires_in_seconds": {
+      "@id": "knoxcall:expires_in_seconds",
+      "@type": "xsd:integer"
+    },
+    "AiGatewayPhantomTokenCreated": "knoxcall:AiGatewayPhantomTokenCreated",
+    "AiGatewayUsageByModel": "knoxcall:AiGatewayUsageByModel",
+    "model": {
+      "@id": "knoxcall:model",
+      "@type": "xsd:string"
+    },
+    "requests": {
+      "@id": "knoxcall:requests",
+      "@type": "xsd:integer"
+    },
+    "input_tokens": {
+      "@id": "knoxcall:input_tokens",
+      "@type": "xsd:integer"
+    },
+    "output_tokens": {
+      "@id": "knoxcall:output_tokens",
+      "@type": "xsd:integer"
+    },
+    "cost_usd": {
+      "@id": "knoxcall:cost_usd",
+      "@type": "xsd:decimal"
+    },
+    "unpriced_requests": {
+      "@id": "knoxcall:unpriced_requests",
+      "@type": "xsd:integer"
+    },
+    "AiGatewayUsageTotals": "knoxcall:AiGatewayUsageTotals",
+    "AiGatewayFirewallRule": "knoxcall:AiGatewayFirewallRule",
+    "flags": {
+      "@id": "knoxcall:flags",
+      "@type": "xsd:string"
+    },
+    "AiGatewayFirewallPolicy": "knoxcall:AiGatewayFirewallPolicy",
+    "heuristics": {
+      "@id": "knoxcall:heuristics",
+      "@container": "@list"
+    },
+    "canary_enabled": {
+      "@id": "knoxcall:canary_enabled",
+      "@type": "xsd:boolean"
+    },
+    "AiGatewayFirewallPolicyCreate": "knoxcall:AiGatewayFirewallPolicyCreate",
+    "AiGatewayFirewallTestResult": "knoxcall:AiGatewayFirewallTestResult",
+    "skipped": {
+      "@id": "knoxcall:skipped",
+      "@container": "@list"
+    },
+    "AiGatewayUsage": "knoxcall:AiGatewayUsage",
+    "period_days": {
+      "@id": "knoxcall:period_days",
+      "@type": "xsd:integer"
+    },
+    "by_model": {
+      "@id": "knoxcall:by_model",
+      "@container": "@list"
+    },
+    "totals": {
+      "@id": "knoxcall:totals",
+      "@type": "@id"
+    },
+    "AiGatewayUsageExportRow": "knoxcall:AiGatewayUsageExportRow",
+    "group": {
+      "@id": "knoxcall:group",
+      "@type": "xsd:string"
+    },
+    "AiGatewayUsageExport": "knoxcall:AiGatewayUsageExport",
+    "group_by": {
+      "@id": "knoxcall:group_by",
+      "@type": "xsd:string"
+    },
+    "rows": {
+      "@id": "knoxcall:rows",
+      "@container": "@list"
+    },
+    "OAuthTokenRequest": "knoxcall:OAuthTokenRequest",
+    "scope": {
+      "@id": "knoxcall:scope",
+      "@type": "xsd:string"
+    },
+    "code": {
+      "@id": "knoxcall:code",
+      "@type": "xsd:string"
+    },
+    "code_verifier": {
+      "@id": "knoxcall:code_verifier",
+      "@type": "xsd:string"
+    },
+    "refresh_token": {
+      "@id": "knoxcall:refresh_token",
+      "@type": "xsd:string"
+    },
+    "device_code": {
+      "@id": "knoxcall:device_code",
+      "@type": "xsd:string"
+    },
+    "OAuthTokenResponse": "knoxcall:OAuthTokenResponse",
+    "expires_in": {
+      "@id": "knoxcall:expires_in",
+      "@type": "xsd:integer"
+    },
+    "tenant": {
+      "@id": "knoxcall:tenant",
+      "@type": "xsd:string"
+    },
+    "OAuthIntrospectRequest": "knoxcall:OAuthIntrospectRequest",
+    "token_type_hint": {
+      "@id": "knoxcall:token_type_hint",
+      "@type": "xsd:string"
+    },
+    "OAuthIntrospectionResponse": "knoxcall:OAuthIntrospectionResponse",
+    "exp": {
+      "@id": "knoxcall:exp",
+      "@type": "xsd:integer"
+    },
+    "iat": {
+      "@id": "knoxcall:iat",
+      "@type": "xsd:integer"
+    },
+    "sub": {
+      "@id": "knoxcall:sub",
+      "@type": "xsd:string"
+    },
+    "OAuthRevokeRequest": "knoxcall:OAuthRevokeRequest",
+    "OAuthDeviceAuthorizationRequest": "knoxcall:OAuthDeviceAuthorizationRequest"
+  },
+  "@type": "schema:Dataset",
+  "schema:name": "KnoxCall API JSON-LD context",
+  "schema:description": "A JSON-LD @context for the objects KnoxCall's own API contract declares: one class per component schema, one property per declared field, typed from the contract. Derived by script (derive-json-ld.py, 2026-10-18) from openapi/knoxcall-openapi.json.",
+  "dcterms:created": "2026-10-18",
+  "dcterms:source": [
+    "openapi/knoxcall-openapi.json"
+  ]
+}

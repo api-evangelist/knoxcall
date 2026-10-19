@@ -1,0 +1,95 @@
+generated: '2026-10-18'
+method: searched
+generator: extract-docs-artifacts.py (local)
+source: https://knoxcall.com/pricing
+sources:
+- https://knoxcall.com/pricing
+- https://docs.knoxcall.com/account/subscription-plans
+name: KnoxCall pricing
+audience: business-product
+pricing_basis: tiered-subscription
+plans:
+- name: Free
+  price_text: $0
+  price: 0
+  description: Free forever to start. 1 API Route, 100 API Calls/Month, 1 Client, 1 Secret, Basic Analytics, 7-Day Log Retention
+  features:
+  - 1 API Route
+  - 100 API Calls/Month
+  - 1 Client
+  - 1 Secret
+  - Basic Analytics
+  - 7-Day Log Retention
+- name: Starter
+  price_text: $19/mo
+  price: 19
+  description: Perfect for individuals and small teams getting started
+  features:
+  - 2 API Routes
+  - 10K API Calls/Month
+  - 2 Team Members
+  - 1 Environment
+  - 7-Day Log Retention
+  - 5 Vaults · 50K tokens
+  - 5 Crypto Keys (AES + HMAC)
+  - 5 Inbound Webhooks
+  - Ephemeral Proxy (100K ops/mo)
+  - 1 AI Gateway agent
+  - Multi-Format Webhook Signing
+- name: Pro
+  price_text: $99/mo
+  price: 99
+  description: For growing businesses that need advanced security and monitoring features
+  features:
+  - 25 API Routes
+  - 1M API Calls/Month
+  - 5 Team Members
+  - Email Alerts
+  - OAuth2 Token Management
+  - 25 Vaults · 1M tokens
+  - Format-Preserving Tokens (PAN, SSN, Email)
+  - 25 Crypto Keys (AES, HMAC, RSA, ECDSA, Ed25519)
+  - JWT sign & verify (RS256, ES256, EdDSA)
+  - Multi-Format Webhook Signing (Stripe, Slack, GitHub)
+  - 25 Inbound Webhooks · 1M events/mo
+  - Ephemeral Proxy (1M ops/mo)
+  - 10 AI Gateway agents
+  - Custom PII redaction policies
+  - HIPAA / PCI / GDPR compliance packs
+  - Custom firewall policies
+  - Prompt-injection screening + canary leak
+  - 10 MCP servers
+  - OIDC workload federation
+  - mTLS Certificates
+  - Fixed Outbound IP - Shared (add-on)
+- name: Enterprise
+  price_text: Custom Pricing
+  description: For large organizations requiring unlimited scale and priority support
+  features:
+  - Unlimited API Routes
+  - Unlimited API Calls/Month
+  - Unlimited Team Members
+  - All Pro Features
+  - Priority Support
+  - Contractual SLA — see Enterprise agreement
+  - Advanced Workflows
+  - Unlimited Vaults & tokens
+  - All token formats (PAN, SSN, Email, Generic)
+  - Unlimited Crypto Keys (all algorithms)
+  - JWT sign & verify (all algorithms)
+  - Multi-Format Webhook Signing
+  - Unlimited Inbound Webhooks & events
+  - Unlimited Ephemeral Proxy ops
+  - BYOK via tenant master key (KMS bring-your-own)
+  - Unlimited AI Gateway agents
+  - Unlimited MCP servers
+  - Custom PII redaction policies
+  - HIPAA / PCI / GDPR compliance packs
+  - Custom firewall policies
+  - mTLS Certificates
+  - Fixed Outbound IP - Shared (add-on)
+  - Fixed Outbound IP - Dedicated (add-on)
+  limits:
+  - name: pricing_basis
+    limit_text: negotiated
+docs: https://knoxcall.com/pricing

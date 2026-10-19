@@ -1,0 +1,45 @@
+generated: '2026-10-18'
+method: searched
+generator: extract-docs-artifacts.py (local)
+source: https://docs.knoxcall.com/security/mtls-certificates
+sources:
+- https://docs.knoxcall.com/security/mtls-certificates
+- https://docs.knoxcall.com/ai-gateway/compliance-packs
+- https://docs.knoxcall.com/security/agent-security-model
+- https://docs.knoxcall.com/security/ai-threat-detection
+standards:
+- id: hipaa
+  conforms: true
+  evidence: One-click HIPAA, PCI-DSS, GDPR, and SOC 2 packs that install PII recognizers and audit-log alert rules — with honest install reporting
+    that never silently drops a rule.
+- id: pci-dss
+  conforms: true
+  evidence: One-click HIPAA, PCI-DSS, GDPR, and SOC 2 packs that install PII recognizers and audit-log alert rules — with honest install reporting
+    that never silently drops a rule.
+- id: gdpr
+  conforms: true
+  evidence: One-click HIPAA, PCI-DSS, GDPR, and SOC 2 packs that install PII recognizers and audit-log alert rules — with honest install reporting
+    that never silently drops a rule.
+- id: soc2
+  conforms: true
+  evidence: One-click HIPAA, PCI-DSS, GDPR, and SOC 2 packs that install PII recognizers and audit-log alert rules — with honest install reporting
+    that never silently drops a rule.
+- id: openapi-3.1
+  conforms: true
+  evidence: the document declares 3.1.0
+- id: oauth2
+  conforms: true
+  evidence: 'securitySchemes: ApiKeyAuth (apiKey), BearerAuth (http), CapabilityTokenAuth (http), OAuth2 (oauth2), PhantomToken (http)'
+- id: rfc9457
+  conforms: false
+  evidence: no response declares application/problem+json
+- id: idempotency
+  conforms: true
+  evidence: X-Idempotency-Key declared on 23 of 126 mutating operations (partial)
+- id: pagination
+  conforms: true
+  evidence: list operations take cursor, limit, offset, page, per_page
+- id: ratelimit-headers
+  conforms: true
+  evidence: responses declare Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
+docs: https://docs.knoxcall.com/security/mtls-certificates

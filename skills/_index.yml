@@ -1,0 +1,30 @@
+generated: '2026-10-18'
+method: generated
+generator: extract-docs-artifacts.py skills (local)
+source: openapi/knoxcall-openapi.json
+skills:
+- file: skills/knoxcall-create-client.md
+  name: knoxcall-create-client
+  api: openapi/knoxcall-openapi.json
+  operations:
+  - createClient
+  - getClient
+- file: skills/knoxcall-process-opportunities.md
+  name: knoxcall-process-opportunities
+  api: openapi/knoxcall-openapi.json
+  operations:
+  - listOpportunities
+  - acceptOpportunity
+  - dismissOpportunity
+- file: skills/knoxcall-signup.md
+  name: knoxcall-signup
+  api: openapi/knoxcall-openapi.json
+  operations:
+  - createAccount
+  - claimSignup
+- file: skills/knoxcall-create-and-test-webhook.md
+  name: knoxcall-create-and-test-webhook
+  api: openapi/knoxcall-openapi.json
+  operations:
+  - createWebhook
+  - testWebhook

@@ -1,0 +1,121 @@
+generated: '2026-10-18'
+method: derived
+source: openapi/knoxcall-openapi.json
+schemes:
+- name: OAuth2
+  source: openapi/knoxcall-openapi.json
+  flows:
+  - flow: clientCredentials
+    tokenUrl: https://api.knoxcall.com/oauth/token
+  - flow: authorizationCode
+    authorizationUrl: https://api.knoxcall.com/oauth/authorize
+    tokenUrl: https://api.knoxcall.com/oauth/token
+  description: |-
+    OAuth 2.1 authentication — recommended for new integrations. Access tokens
+    (`kc_` prefix) are minted at the root-host token endpoint
+    `https://api.knoxcall.com/oauth/token` and passed as `Authorization: Bearer <access_token>`.
+    Public clients must use PKCE with the `authorization_code` grant; confidential
+    clients may use `client_credentials`. The first-party SDKs and the
+    `knoxcall login` CLI handle token minting, caching, refresh, and DPoP for you.
+scopes:
+- scope: '*:*'
+  description: Full access (all scopes).
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: clients:read
+  description: Read clients.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: clients:write
+  description: Manage clients.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: proxy:invoke
+  description: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY
+    verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed
+    credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: routes:read
+  description: Read routes.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: routes:write
+  description: Create, update, and delete routes.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: secrets:oauth_token
+  description: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token).
+    Distinct from secrets:read because the call refreshes the credential at the provider.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: secrets:read
+  description: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: secrets:write
+  description: Create, update, and delete secrets.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: transit:decrypt
+  description: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating
+    a `decrypt` route action, which stores a standing instruction to open every matching field
+    on every later request through that route. It is the same capability name the policy engine
+    uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission
+    to open the data flowing through it.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: vaults:detokenize
+  description: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token},
+    by a token template reference in a /v1/proxy body, and by creating a `detokenize` route
+    action. Distinct from vaults:read, which lists vaults and token metadata and never returns
+    a value.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: webhooks:write
+  description: Manage webhooks.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json
+- scope: workflows:write
+  description: Manage and execute workflows.
+  flows:
+  - authorizationCode
+  - clientCredentials
+  sources:
+  - openapi/knoxcall-openapi.json

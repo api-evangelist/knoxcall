@@ -1,0 +1,1350 @@
+openapi: 3.2.0
+info:
+  title: KnoxCall Client Management Vaults API
+  version: '1.0'
+  description: 'The KnoxCall Client Management API provides programmatic access to manage your API gateway
+
+    resources including routes, secrets, clients, environments, webhooks, and API keys. ## Authentication
+
+
+    All requests must include an OAuth 2.1 access token **or** a legacy API key. The
+
+    recommended path for new integrations is the first-party SDKs, which mint, cache, and
+
+    refresh OAuth tokens for you (start with `knoxcall login` on a developer machine, or
+
+    `KNOXCALL_CLIENT_ID` / `KNOXCALL_CLIENT_SECRET` in CI). You can authenticate using any of:
+
+
+    - **Authorization header (OAuth 2.1 bearer token — recommended)**: `Authorization: Bearer `
+
+    - **Authorization header (legacy API key)**: `Authorization: Bearer tk_xxx_yyy`
+
+    - **x-api-key header (legacy API key)**: `x-api-key: tk_xxx_yyy`
+
+
+    OAuth 2.1 access tokens (`kc_` prefix) are minted at the root-host token endpoint
+
+    `https://api.knoxcall.com/oauth/token` (not under `/v1`) using the `client_credentials`
+
+    or `authorization_code` grant. See the `OAuth2` security scheme and the `/oauth/*`
+
+    endpoints. Some resources that are managed exclusively through OAuth reject API-key auth
+
+    with a `403 use_oauth` error. Long-lived API keys remain fully supported. They come in three types:
+
+    - **Standard keys** (`tk_` prefix) are used on the production API (`api.knoxcall.com`). - **Test keys** (`tk_` prefix, type=test) are used on the sandbox API (`sandbox.knoxcall.com`). - **Enterprise Access Keys** (`AKE` prefix) follow the format `AKE[16chars]:[40chars]`. Using a test key on the production API (or vice versa) will return a `403 wrong_key_type` error. ## Request IDs
+
+
+    Every response — success or error — includes an `X-Request-Id` response header (a UUID). Its value is identical to the `request_id` field in the response body (`meta.request_id`
+
+    on success, `error.request_id` on error). Quote it when contacting support. ## API Versioning
+
+
+    The API is versioned on two axes:
+
+
+    - **Major version — the `/v1` path prefix.** Breaking changes ship under a new major
+
+    (`/v2`). `/v1` never receives a breaking change. - **Minor version — the `KnoxCall-Version` header (dated, `YYYY-MM-DD`).** Send
+
+    `KnoxCall-Version: 2026-08-05` to pin the behaviour of a specific dated release. Omit
+
+    the header to get the newest minor version. Every response echoes the resolved version
+
+    back in a `KnoxCall-Version` response header. Within a major version, **additive changes are not breaking** and may appear without a new
+
+    dated version: new endpoints, new optional request fields, new response fields, new
+
+    `error.type` values, and new enum members. Clients must tolerate unknown response fields
+
+    and unknown `error.type` values (see the `ErrorResponse` schema). An **unknown or malformed** `KnoxCall-Version` value returns `400` with
+
+    `error.type: invalid_api_version`. ## Rate Limiting
+
+
+    API keys can have optional rate limits configured. When a limit is configured, the
+
+    following headers are emitted on **every** response (not only `429`s):
+
+    - `X-RateLimit-Limit` -- maximum requests allowed per window
+
+    - `X-RateLimit-Remaining` -- remaining requests in the current window
+
+    - `X-RateLimit-Reset` -- epoch seconds at which the window resets
+
+
+    When the limit is exceeded the API returns `429` (`rate_limit_exceeded` / `rate_limited`)
+
+    and additionally sets `Retry-After` (seconds until the window resets). ## DPoP sender-constrained tokens, and the server nonce
+
+
+    A token minted with a `cnf.jkt` binding (DPoP, RFC 9449) requires a `DPoP` proof header
+
+    on every request, signed over the request''s method and canonical public URL. **Every response to a request that carried a `DPoP` header also carries a
+
+    `DPoP-Nonce` response header** -- mints, refusals and successful calls alike, on
+
+    `POST /oauth/token`, `/v1`, the tenant data plane, the self-hosted proxy and the AI
+
+    gateway. The value is stateless and changes every minute; the server accepts the current
+
+    and the previous minute''s, so a nonce is good for 60-120 seconds.'
+  contact:
+    name: KnoxCall Support
+    url: https://knoxcall.com
+    email: support@knoxcall.com
+  license:
+    name: Proprietary
+    url: https://knoxcall.com/terms
+servers:
+- url: https://api.knoxcall.com/v1
+  description: Production
+- url: https://sandbox.knoxcall.com/v1
+  description: Sandbox (test keys only)
+security:
+- OAuth2: []
+- BearerAuth: []
+- ApiKeyAuth: []
+tags:
+- name: Vaults
+  description: Data tokenization vaults — swap sensitive values for format-preserving tokens and detokenize them under audit.
+paths:
+  /vaults:
+    get:
+      operationId: listVaults
+      summary: List vaults
+      tags:
+      - Vaults
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of vaults.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vault'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: createVault
+      summary: Create a vault
+      description: 'Creates a tokenization vault with its own encryption key.
+
+        `token_format` selects the token shape: `generic` (`tok_` Crockford
+
+        base32), or the format-preserving `pan`, `ssn`, `email` formats
+
+        (paid plans). Dual-custody vaults support only `generic`.
+
+
+        **A `pan` vault requires a non-empty `allowed_destinations` list.** Card
+
+        numbers may only be sent to processors you have named, and are never
+
+        returned in the clear: `GET /vaults/{nameOrId}/tokens/{idOrToken}` and
+
+        `POST /client/detokenize` both answer `403 vault_destination_refused` for
+
+        a `pan` vault. Reference the token from `POST /proxy` (or a Route)
+
+        instead, and the value is substituted on the wire.
+
+
+        A value that looks like a payment card number — 13-19 digits after
+
+        stripping spaces and hyphens, and Luhn-valid — is refused by every
+
+        `token_format` except `pan`.'
+      tags:
+      - Vaults
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVaultRequest'
+            example:
+              name: payments-vault
+              token_format: pan
+              default_ttl_seconds: 2592000
+              allowed_destinations:
+              - api.stripe.com
+      responses:
+        '200':
+          description: The created vault.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Vault'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: 'Payment Required — this action exceeds your plan''s limits. Format-preserving
+
+            token formats (and other gated features) require a paid plan, or a resource
+
+            quota was reached. `error.type: plan_limit`.
+
+            '
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            KnoxCall-Version:
+              $ref: '#/components/headers/KnoxCall-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  type: plan_limit
+                  message: Format-preserving token formats require a paid plan.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReuse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /vaults/{nameOrId}:
+    parameters:
+    - $ref: '#/components/parameters/VaultNameOrId'
+    get:
+      operationId: getVault
+      summary: Get vault details
+      description: Returns the vault plus live token stats.
+      tags:
+      - Vaults
+      responses:
+        '200':
+          description: Vault with stats.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                    - $ref: '#/components/schemas/Vault'
+                    - type: object
+                      properties:
+                        stats:
+                          type: object
+                          properties:
+                            token_count:
+                              type: integer
+                            active_count:
+                              type: integer
+                            expiring_in_24h:
+                              type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateVault
+      summary: Update a vault
+      description: 'Updates `default_ttl_seconds`, `description`, `enabled`, `metadata_jsonb` and/or `allowed_destinations`. Token format and custody mode are immutable. Sending `allowed_destinations: null` removes the destination restriction — which a `pan` vault may not do; replace the list instead.'
+      tags:
+      - Vaults
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                default_ttl_seconds:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                description:
+                  type:
+                  - string
+                  - 'null'
+                enabled:
+                  type: boolean
+                metadata_jsonb:
+                  type: object
+                  additionalProperties: true
+                allowed_destinations:
+                  type:
+                  - array
+                  - 'null'
+                  items:
+                    type: string
+                  example:
+                  - api.stripe.com
+                  - '*.adyen.com'
+                  description: Replace the destination allowlist. Omit the key to leave it unchanged; `null` removes the restriction (refused on a `pan` vault). An empty array is refused — send `null` to clear.
+      responses:
+        '200':
+          description: The updated vault.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Vault'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/RequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReuse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteVault
+      summary: Delete a vault
+      description: Deletes the vault and all of its tokens. `deleted` echoes the vault **name** (string).
+      tags:
+      - Vaults
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyParam'
+      responses:
+        '200':
+          description: Vault deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: string
+                        example: payments-vault
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/RequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReuse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /vaults/{nameOrId}/rotate:
+    parameters:
+    - $ref: '#/components/parameters/VaultNameOrId'
+    post:
+      operationId: rotateVault
+      summary: Rotate the vault key
+      description: Mints a new version of the vault's encryption key. Existing tokens remain detokenizable.
+      tags:
+      - Vaults
+      responses:
+        '200':
+          description: Rotation result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      new_version:
+                        type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /vaults/{nameOrId}/tokens:
+    parameters:
+    - $ref: '#/components/parameters/VaultNameOrId'
+    get:
+      operationId: listVaultTokens
+      summary: List tokens
+      description: Returns a paginated list of token metadata. Original values are never included — use the detokenize endpoint.
+      tags:
+      - Vaults
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: A paginated list of tokens.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VaultToken'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      operationId: tokenizeValue
+      summary: Tokenize a value
+      description: Encrypts a value into the vault and returns the token that stands in for it.
+      tags:
+      - Vaults
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - value
+              properties:
+                value:
+                  type: string
+                  description: The sensitive value to tokenize. Must match the vault's format (e.g. Luhn-valid PAN for `pan` vaults).
+                metadata:
+                  type: object
+                  additionalProperties: true
+                  description: Optional metadata stored encrypted alongside the value.
+                ttl_seconds:
+                  type:
+                  - integer
+                  - 'null'
+                  minimum: 1
+                  description: Token lifetime. Omit/null for the vault default.
+                card_exp_month:
+                  type: integer
+                  minimum: 1
+                  maximum: 12
+                  description: The CARD's expiry month (1-12). `pan` vaults only, and only together with `card_exp_year` — this is the card's own expiration date, not `ttl_seconds`, which is how long the TOKEN lives. Supplying it subscribes the token to the `vault.token.expiring` webhook event, emitted 60 and 30 days before the card expires. Offering it to a non-`pan` vault is a `validation_error`.
+                card_exp_year:
+                  type: integer
+                  minimum: 1970
+                  maximum: 2199
+                  description: The CARD's expiry year, four digits (`2029`, never `29`). Required whenever `card_exp_month` is given.
+            example:
+              value: '4111111111111111'
+              card_exp_month: 7
+              card_exp_year: 2029
+              metadata:
+                order_id: ord_123
+      responses:
+        '200':
+          description: The token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VaultTokenCreated'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          description: '`validation_error` — the request failed validation; or `wrong_format` — the value (or a string inside `metadata`) is a payment card number and this vault''s `token_format` is not `pan`. Card numbers are only ever stored in a `pan` vault, which carries the Luhn precondition, the format-preserving BIN/last4 token and the required destination allowlist. The refusal never echoes the value.'
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            KnoxCall-Version:
+              $ref: '#/components/headers/KnoxCall-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The vault is disabled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /vaults/{nameOrId}/tokens/bulk:
+    parameters:
+    - $ref: '#/components/parameters/VaultNameOrId'
+    post:
+      operationId: tokenizeBulk
+      summary: Tokenize values in bulk
+      description: Tokenizes up to 1000 values in one call.
+      tags:
+      - Vaults
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - values
+              properties:
+                values:
+                  type: array
+                  minItems: 1
+                  maxItems: 1000
+                  items:
+                    type: object
+                    required:
+                    - value
+                    properties:
+                      value:
+                        type: string
+                      metadata:
+                        type: object
+                        additionalProperties: true
+                      ttl_seconds:
+                        type:
+                        - integer
+                        - 'null'
+                      card_exp_month:
+                        type: integer
+                        minimum: 1
+                        maximum: 12
+                        description: The CARD's expiry month. `pan` vaults only, with `card_exp_year`. Per value, not per batch. A refusal names the offending index and rolls the whole batch back.
+                      card_exp_year:
+                        type: integer
+                        minimum: 1970
+                        maximum: 2199
+                        description: The CARD's expiry year, four digits.
+      responses:
+        '200':
+          description: The tokens, in input order.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      tokens:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/VaultTokenCreated'
+                      count:
+                        type: integer
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          description: '`validation_error` — the request failed validation; or `wrong_format` — one of `values[]` (or a string inside its `metadata`) is a payment card number and this vault''s `token_format` is not `pan`. Card numbers are only ever stored in a `pan` vault, which carries the Luhn precondition, the format-preserving BIN/last4 token and the required destination allowlist. The message names the offending INDEX, and the whole batch is refused — no token is stored for any value in it. The refusal never echoes the value.'
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/X-Request-Id'
+            KnoxCall-Version:
+              $ref: '#/components/headers/KnoxCall-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /vaults/{nameOrId}/tokens/{idOrToken}:
+    parameters:
+    - $ref: '#/components/parameters/VaultNameOrId'
+    - name: idOrToken
+      in: path
+      required: true
+      schema:
+        type: string
+      description: The token record UUID or the token string itself.
+    get:
+      operationId: detokenizeValue
+      summary: Detokenize (reveal the value)
+      description: 'Returns the original value for a token. This is the most sensitive
+
+        vault permission — every call (including misses and refusals) is written
+
+        to the audit log.
+
+
+        **Not available on a `pan` vault.** A card number leaves a `pan` vault
+
+        only through detokenize-and-send: this endpoint answers
+
+        `403 vault_destination_refused`, and so does `POST /client/detokenize`.
+
+        Reference the token from `POST /proxy` (or a Route) and the value is
+
+        substituted on the wire to an allowed destination.
+
+
+        For any vault, a token whose `expires_at` has passed answers `404` —
+
+        expiry is evaluated by the database, not by the worker answering the
+
+        request.
+
+
+        Counts against your plan''s `detokenize` operations for the month; at the
+
+        limit this answers `402 plan_limit` and nothing is decrypted.'
+      tags:
+      - Vaults
+      responses:
+        '200':
+          description: The token with its original value.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VaultTokenDetail'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateVaultTokenMetadata
+      summary: Update token metadata
+      description: Replaces the token's metadata object.
+      tags:
+      - Vaults
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - metadata
+              properties:
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Update acknowledged.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      updated:
+                        type: boolean
+                        example: true
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      operationId: deleteVaultToken
+      summary: Delete a token
+      description: Permanently deletes a token. Its value becomes unrecoverable. `deleted` echoes the ID or token string you passed.
+      tags:
+      - Vaults
+      responses:
+        '200':
+          description: Token deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: string
+                        example: tok_5H2K9QW3JF7M
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  schemas:
+    CreateVaultRequest:
+      type: object
+      required:
+      - name
+      - token_format
+      properties:
+        name:
+          type: string
+          description: Vault name (slug, 1-64 chars).
+          example: payments-vault
+        token_format:
+          type: string
+          enum:
+          - generic
+          - pan
+          - ssn
+          - email
+          description: Token shape. Format-preserving formats (`pan`, `ssn`, `email`) require a paid plan. A value that looks like a payment card number (13-19 digits after stripping spaces and hyphens, and Luhn-valid) is refused by every format except `pan`.
+        custody_mode:
+          type: string
+          enum:
+          - managed
+          - dual
+          default: managed
+          description: Dual-custody vaults support only `token_format` `generic`.
+        default_ttl_seconds:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          description: Default token lifetime. Omit/null for no expiry.
+        description:
+          type: string
+        metadata_jsonb:
+          type: object
+          additionalProperties: true
+        allowed_destinations:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          example:
+          - api.stripe.com
+          description: Hosts this vault's values may be sent to. Omit or `null` for unrestricted. **Required and non-empty when `token_format` is `pan`.** See the `Vault` schema for the matching rules.
+    VaultToken:
+      type: object
+      description: Token metadata as returned in list responses. The original value is never included.
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+          description: The token string that stands in for the original value.
+          example: tok_5H2K9QW3JF7M
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+        created_by_api_key_id:
+          type:
+          - string
+          - 'null'
+        created_by_user_id:
+          type:
+          - string
+          - 'null'
+        card_expires_on:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: 'The LAST DAY of the payment card''s expiry month (`2029-07-31`), for a token in a `pan` vault whose tokenize call supplied one; `null` otherwise. NOT the token''s lifetime — that is `expires_at`. Tokens created before 2026-09-17 carry `null` and cannot be backfilled: the expiry was never captured, so they receive no `vault.token.expiring` event until they are tokenized again.'
+        card_funding_type:
+          type:
+          - string
+          - 'null'
+          enum:
+          - credit
+          - debit
+          - prepaid
+          - null
+          description: 'How the issuing bank funds the card, looked up from its first six digits at tokenize time for a token in a `pan` vault. Advisory metadata for your own routing and fraud rules — KnoxCall makes no decision on it. **Ships `null` on every token**: BIN data comes from a licensed table and KnoxCall has not licensed one, so treat both BIN fields as optional indefinitely. Also `null` for every non-`pan` vault, and for any BIN a future table does not carry.'
+        card_issuing_country:
+          type:
+          - string
+          - 'null'
+          minLength: 2
+          maxLength: 2
+          pattern: ^[A-Z]{2}$
+          example: IE
+          description: 'The issuing bank''s country as ISO 3166-1 alpha-2, upper case, looked up from the card''s first six digits at tokenize time. Same availability as `card_funding_type`: **`null` on every token today**, and `null` for any card whose issuer is not in the table.'
+    Vault:
+      type: object
+      description: A tokenization vault with its own encryption key.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 3c2b1a0f-9e8d-4c7b-6a5f-4e3d2c1b0a9f
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: payments-vault
+        token_format:
+          type: string
+          enum:
+          - generic
+          - pan
+          - ssn
+          - email
+          description: 'Token shape: `generic` (`tok_` Crockford base32) or a format-preserving format.'
+        crypto_key_id:
+          type: string
+          format: uuid
+          description: The vault's dedicated encryption key.
+        custody_mode:
+          type: string
+          enum:
+          - managed
+          - dual
+          description: '`managed` — KnoxCall holds the key; `dual` — tokens are `kc:` ciphertexts requiring both parties to detokenize.'
+        default_ttl_seconds:
+          type:
+          - integer
+          - 'null'
+          description: Default token lifetime. Null means tokens never expire by default.
+        metadata_jsonb:
+          type: object
+          additionalProperties: true
+          description: Free-form vault metadata.
+        description:
+          type:
+          - string
+          - 'null'
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type:
+          - string
+          - 'null'
+          description: The API key or user that created the vault.
+        sandbox:
+          type: boolean
+          description: Whether this vault lives in Test (sandbox) mode.
+        allowed_destinations:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
+          example:
+          - api.stripe.com
+          - '*.adyen.com'
+          description: 'Destination binding. `null` means unrestricted. A non-empty array is the set of upstream hosts this vault''s values may be sent to via `POST /v1/proxy` or a Route; a send to any other host is refused with `403 vault_destination_refused` before the value is decrypted. Each entry is an exact hostname or a `*.suffix` wildcard. A wildcard is a suffix test: `*.stripe.com` matches `api.stripe.com` but not the bare apex `stripe.com` and not `api.stripe.com.evil.com`. **Required (non-empty) for `token_format` `pan`**, which additionally refuses every plain-read path — a card number leaves a `pan` vault only through detokenize-and-send.'
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
+    VaultTokenCreated:
+      type: object
+      description: The result of tokenizing a value.
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+          description: The token string — store this in place of the original value.
+          example: tok_5H2K9QW3JF7M
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        card_expires_on:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: 'The LAST DAY of the payment card''s expiry month (`2029-07-31`), for a token in a `pan` vault whose tokenize call supplied one; `null` otherwise. NOT the token''s lifetime — that is `expires_at`. Tokens created before 2026-09-17 carry `null` and cannot be backfilled: the expiry was never captured, so they receive no `vault.token.expiring` event until they are tokenized again.'
+        card_funding_type:
+          type:
+          - string
+          - 'null'
+          enum:
+          - credit
+          - debit
+          - prepaid
+          - null
+          description: 'How the issuing bank funds the card, looked up from its first six digits at tokenize time for a token in a `pan` vault. Advisory metadata for your own routing and fraud rules — KnoxCall makes no decision on it. **Ships `null` on every token**: BIN data comes from a licensed table and KnoxCall has not licensed one, so treat both BIN fields as optional indefinitely. Also `null` for every non-`pan` vault, and for any BIN a future table does not carry.'
+        card_issuing_country:
+          type:
+          - string
+          - 'null'
+          minLength: 2
+          maxLength: 2
+          pattern: ^[A-Z]{2}$
+          example: IE
+          description: 'The issuing bank''s country as ISO 3166-1 alpha-2, upper case, looked up from the card''s first six digits at tokenize time. Same availability as `card_funding_type`: **`null` on every token today**, and `null` for any card whose issuer is not in the table.'
+    PaginationMeta:
+      type: object
+      description: Pagination metadata for list endpoints.
+      properties:
+        total:
+          type: integer
+          description: Total number of records matching the query.
+          example: 42
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        per_page:
+          type: integer
+          description: Number of records per page.
+          example: 20
+        total_pages:
+          type: integer
+          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
+          example: 3
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - total
+      - page
+      - per_page
+      - total_pages
+      - request_id
+    RequestMeta:
+      type: object
+      description: Metadata included with every API response.
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    VaultTokenDetail:
+      type: object
+      description: A detokenized token — includes the original value.
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+          example: tok_5H2K9QW3JF7M
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        value:
+          type: string
+          description: The original value (UTF-8).
+        value_b64:
+          type: string
+          description: The original value, base64-encoded (for binary-safe handling).
+        metadata:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+        crypto_key_version:
+          type: integer
+          description: The vault key version that encrypted this token.
+  headers:
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+  parameters:
+    PerPageParam:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page (max 100).
+    VaultNameOrId:
+      name: nameOrId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: The vault name or UUID.
+      example: payments-vault
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
+    IdempotencyKeyParam:
+      name: X-Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+      description: 'Optional idempotency key so a retried mutating request is executed at most once.
+
+        The standard `Idempotency-Key` spelling is also accepted. Replaying a completed
+
+        request with the same key returns the original stored response with an
+
+        `X-Idempotent-Replay: true` header. A key still in progress returns
+
+        `409 request_in_progress`; the same key with a different body returns
+
+        `422 idempotency_key_reuse`; a malformed key returns `400 invalid_idempotency_key`.
+
+        '
+      example: 3f6c9b2e-1a4d-4c8e-9b0a-7d2e5f1c3a8b
+  responses:
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    Conflict:
+      description: A resource with the same unique identifier already exists, or the resource is in use.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: conflict
+              message: A route with this name already exists.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    RequestInProgress:
+      description: 'A request with the same idempotency key is still being processed. Retry after a
+
+        short delay; do not change the request body.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: request_in_progress
+              message: A request with this idempotency key is already in progress.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    InternalError:
+      description: An unexpected server error occurred.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: internal_error
+              message: An unexpected error occurred.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    IdempotencyKeyReuse:
+      description: 'The supplied idempotency key was already used for a request with a different body.
+
+        Idempotency keys may only be reused with an identical request.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: idempotency_key_reuse
+              message: This idempotency key was already used with a different request body.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    Unauthorized:
+      description: Authentication is required or the provided API key is invalid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_key:
+              summary: No API key provided
+              value:
+                error:
+                  type: authentication_required
+                  message: 'API key is required. Use Authorization: Bearer <api_key> or x-api-key header.'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_key:
+              summary: Invalid API key
+              value:
+                error:
+                  type: invalid_api_key
+                  message: Invalid API key.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: 'OAuth 2.1 authentication — recommended for new integrations. Access tokens
+
+        (`kc_` prefix) are minted at the root-host token endpoint
+
+        `https://api.knoxcall.com/oauth/token` and passed as `Authorization: Bearer <access_token>`.
+
+        Public clients must use PKCE with the `authorization_code` grant; confidential
+
+        clients may use `client_credentials`. The first-party SDKs and the
+
+        `knoxcall login` CLI handle token minting, caching, refresh, and DPoP for you.
+
+        '
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+        authorizationCode:
+          authorizationUrl: https://api.knoxcall.com/oauth/authorize
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+    PhantomToken:
+      type: http
+      scheme: bearer
+      description: "The AI **data plane** credential — a `kp_`-prefixed capability token, not a\nManagement API credential. It is minted per agent (or per MCP resource) at\n`POST /v1/ai-gateway/agents/{agentId}/tokens`, or exchanged from a CI workload's\nOIDC token at `POST /v1/oauth/token`, and it is the ONLY credential `/v1/ai/*`\naccepts: an OAuth `kc_` access token or a `tk_` API key is refused there, and a\n`kp_` token is refused on `api.knoxcall.com`.\n\nThree header spellings are accepted, so an existing provider SDK can be pointed at\nthe agent URL without rewriting its auth:\n\n    Authorization: Bearer kp_live_a_...\n    x-api-key: kp_live_a_...\n    x-knox-ai-key: kp_live_a_...\n\n`kp_live_` is refused on the sandbox host and `kp_test_` on the Live host — the env\nsegment is enforced, not cosmetic. DPoP-bound tokens additionally require a valid\n`DPoP` proof header on every request, signed over the canonical public URL rather\nthan a rewritten `Host`.\n\nA rejected credential answers `401`/`403` in the data-plane error envelope with the\ncause in `code` and in the `X-Auth-Failure` response header.\n"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Legacy long-lived API key authentication via the Authorization header.
+
+        Pass your API key as: `Authorization: Bearer tk_xxx_yyy`.
+
+
+        Standard keys (`tk_` prefix) are accepted on `api.knoxcall.com`.
+
+        Test keys (type=test) are accepted on `sandbox.knoxcall.com`.
+
+        Enterprise Access Keys (`AKE` prefix) are accepted on both.
+
+
+        Fully supported, but prefer the `OAuth2` scheme (or the SDKs, which handle
+
+        OAuth for you) for new integrations.
+
+        '
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: 'Legacy API key authentication via the `x-api-key` header.
+
+        This is an alternative to Bearer token authentication for clients that cannot
+
+        set the `Authorization` header. Prefer the `OAuth2` scheme for new integrations.
+
+        '
+    CapabilityTokenAuth:
+      type: http
+      scheme: bearer
+      description: 'Single-use client capability token (`kct_` prefix), passed as
+
+        `Authorization: Bearer kct_...`. Minted server-side via
+
+        `POST /client-tokens` and bound either to one exact payload + action
+
+        (`decrypt`, `detokenize`) or to one vault + a closed set of page
+
+        origins (`tokenize`). This is NOT an API key — it authenticates only
+
+        the `POST /client/decrypt`, `POST /client/detokenize` and
+
+        `POST /client/tokenize` consume endpoints and is invalidated after its
+
+        first use.
+
+        '

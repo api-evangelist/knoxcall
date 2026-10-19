@@ -1,0 +1,473 @@
+openapi: 3.2.0
+info:
+  title: KnoxCall Client Management Webhook Events API
+  version: '1.0'
+  description: 'The KnoxCall Client Management API provides programmatic access to manage your API gateway
+
+    resources including routes, secrets, clients, environments, webhooks, and API keys. ## Authentication
+
+
+    All requests must include an OAuth 2.1 access token **or** a legacy API key. The
+
+    recommended path for new integrations is the first-party SDKs, which mint, cache, and
+
+    refresh OAuth tokens for you (start with `knoxcall login` on a developer machine, or
+
+    `KNOXCALL_CLIENT_ID` / `KNOXCALL_CLIENT_SECRET` in CI). You can authenticate using any of:
+
+
+    - **Authorization header (OAuth 2.1 bearer token — recommended)**: `Authorization: Bearer `
+
+    - **Authorization header (legacy API key)**: `Authorization: Bearer tk_xxx_yyy`
+
+    - **x-api-key header (legacy API key)**: `x-api-key: tk_xxx_yyy`
+
+
+    OAuth 2.1 access tokens (`kc_` prefix) are minted at the root-host token endpoint
+
+    `https://api.knoxcall.com/oauth/token` (not under `/v1`) using the `client_credentials`
+
+    or `authorization_code` grant. See the `OAuth2` security scheme and the `/oauth/*`
+
+    endpoints. Some resources that are managed exclusively through OAuth reject API-key auth
+
+    with a `403 use_oauth` error. Long-lived API keys remain fully supported. They come in three types:
+
+    - **Standard keys** (`tk_` prefix) are used on the production API (`api.knoxcall.com`). - **Test keys** (`tk_` prefix, type=test) are used on the sandbox API (`sandbox.knoxcall.com`). - **Enterprise Access Keys** (`AKE` prefix) follow the format `AKE[16chars]:[40chars]`. Using a test key on the production API (or vice versa) will return a `403 wrong_key_type` error. ## Request IDs
+
+
+    Every response — success or error — includes an `X-Request-Id` response header (a UUID). Its value is identical to the `request_id` field in the response body (`meta.request_id`
+
+    on success, `error.request_id` on error). Quote it when contacting support. ## API Versioning
+
+
+    The API is versioned on two axes:
+
+
+    - **Major version — the `/v1` path prefix.** Breaking changes ship under a new major
+
+    (`/v2`). `/v1` never receives a breaking change. - **Minor version — the `KnoxCall-Version` header (dated, `YYYY-MM-DD`).** Send
+
+    `KnoxCall-Version: 2026-08-05` to pin the behaviour of a specific dated release. Omit
+
+    the header to get the newest minor version. Every response echoes the resolved version
+
+    back in a `KnoxCall-Version` response header. Within a major version, **additive changes are not breaking** and may appear without a new
+
+    dated version: new endpoints, new optional request fields, new response fields, new
+
+    `error.type` values, and new enum members. Clients must tolerate unknown response fields
+
+    and unknown `error.type` values (see the `ErrorResponse` schema). An **unknown or malformed** `KnoxCall-Version` value returns `400` with
+
+    `error.type: invalid_api_version`. ## Rate Limiting
+
+
+    API keys can have optional rate limits configured. When a limit is configured, the
+
+    following headers are emitted on **every** response (not only `429`s):
+
+    - `X-RateLimit-Limit` -- maximum requests allowed per window
+
+    - `X-RateLimit-Remaining` -- remaining requests in the current window
+
+    - `X-RateLimit-Reset` -- epoch seconds at which the window resets
+
+
+    When the limit is exceeded the API returns `429` (`rate_limit_exceeded` / `rate_limited`)
+
+    and additionally sets `Retry-After` (seconds until the window resets). ## DPoP sender-constrained tokens, and the server nonce
+
+
+    A token minted with a `cnf.jkt` binding (DPoP, RFC 9449) requires a `DPoP` proof header
+
+    on every request, signed over the request''s method and canonical public URL. **Every response to a request that carried a `DPoP` header also carries a
+
+    `DPoP-Nonce` response header** -- mints, refusals and successful calls alike, on
+
+    `POST /oauth/token`, `/v1`, the tenant data plane, the self-hosted proxy and the AI
+
+    gateway. The value is stateless and changes every minute; the server accepts the current
+
+    and the previous minute''s, so a nonce is good for 60-120 seconds.'
+  contact:
+    name: KnoxCall Support
+    url: https://knoxcall.com
+    email: support@knoxcall.com
+  license:
+    name: Proprietary
+    url: https://knoxcall.com/terms
+servers:
+- url: https://api.knoxcall.com/v1
+  description: Production
+- url: https://sandbox.knoxcall.com/v1
+  description: Sandbox (test keys only)
+security:
+- OAuth2: []
+- BearerAuth: []
+- ApiKeyAuth: []
+tags:
+- name: Webhook Events
+paths: {}
+webhooks:
+  requestReceived:
+    post:
+      operationId: onRequestReceived
+      summary: Request received
+      description: Fired when a proxied request is received by a route.
+      tags:
+      - Webhook Events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookEventPayload'
+      responses:
+        '200':
+          description: Webhook received successfully.
+  requestSuccess:
+    post:
+      operationId: onRequestSuccess
+      summary: Request succeeded (2xx)
+      description: Fired when a proxied request returns a 2xx success status.
+      tags:
+      - Webhook Events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookEventPayload'
+      responses:
+        '200':
+          description: Webhook received successfully.
+  requestError:
+    post:
+      operationId: onRequestError
+      summary: Request error (4xx/5xx/timeout)
+      description: Fired when a proxied request returns a 4xx, 5xx, or times out.
+      tags:
+      - Webhook Events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookEventPayload'
+      responses:
+        '200':
+          description: Webhook received successfully.
+  requestCompleted:
+    post:
+      operationId: onRequestCompleted
+      summary: Request completed (any status)
+      description: Fired for every completed proxied request, regardless of status.
+      tags:
+      - Webhook Events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookEventPayload'
+      responses:
+        '200':
+          description: Webhook received successfully.
+  vaultTokenExpiring:
+    post:
+      operationId: onVaultTokenExpiring
+      summary: Stored card approaching expiry
+      description: Fired 60 and 30 days before a stored payment card's expiry date, so a card-on-file customer can be prompted to update it before their payment processor declines. Emitted once per (token, threshold) by a daily job — never by a request — and scoped to the token's data space, so a Test-mode card reaches only Test-mode webhooks. A token receives this only if its tokenize call supplied `card_exp_month` / `card_exp_year`. The payload carries the token, never the card number.
+      tags:
+      - Webhook Events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VaultTokenExpiringEventPayload'
+      responses:
+        '200':
+          description: Webhook received successfully.
+components:
+  schemas:
+    VaultTokenExpiringEventPayload:
+      type: object
+      description: 'Payload delivered for the `vault.token.expiring` event — Card-Grade
+
+        Vaults. Signed exactly like every other webhook delivery.
+
+
+        It carries the TOKEN (the format-preserving alias you already store) and
+
+        never the card number, and there is no field that could hold one: a
+
+        delivery whose contents were card-shaped is refused server-side rather
+
+        than sent.
+
+        '
+      properties:
+        event:
+          type: string
+          enum:
+          - vault.token.expiring
+          example: vault.token.expiring
+        timestamp:
+          type: string
+          format: date-time
+          description: When the notice was decided.
+        data:
+          type: object
+          properties:
+            token_id:
+              type: string
+              format: uuid
+              description: The vault token's uuid.
+            token:
+              type: string
+              description: The token string you store in place of the card. For a `pan` vault it preserves the card's BIN and last four, and it is NOT a usable card number.
+              example: '4111114725124116'
+            vault_id:
+              type: string
+              format: uuid
+            vault_name:
+              type: string
+              example: cards
+            last4:
+              type: string
+              description: The card's last four digits, read off the token alias.
+              example: '4116'
+            card_expires_on:
+              type: string
+              format: date
+              description: The last day of the card's expiry month.
+              example: '2029-07-31'
+            days_until_expiry:
+              type: integer
+              description: Days from today to `card_expires_on`, by the server's clock.
+              example: 60
+            threshold_days:
+              type: integer
+              enum:
+              - 60
+              - 30
+              description: Which notice this is. Each fires at most once per token; the window stays open a few days past the exact day so a run the job missed catches up rather than skipping the notice entirely.
+            sandbox:
+              type: boolean
+              description: The token's data space. A Test-mode card is only ever delivered to Test-mode webhooks.
+    WebhookEventPayload:
+      type: object
+      description: 'Payload delivered to webhook endpoints when events are triggered.
+
+        All payloads are signed with HMAC-SHA256 using the webhook''s `secret_key`.
+
+        The signature is sent in the `X-KnoxCall-Signature` header.
+
+        '
+      properties:
+        event:
+          type: string
+          enum:
+          - request.received
+          - request.success
+          - request.redirect
+          - request.client_error
+          - request.server_error
+          - request.timeout
+          - request.error
+          - request.completed
+          description: The event type that triggered this webhook delivery.
+          example: request.server_error
+        timestamp:
+          type: string
+          format: date-time
+          description: When the event occurred.
+          example: '2025-03-15T10:30:00.000Z'
+        webhook_id:
+          type: string
+          format: uuid
+          description: The ID of the webhook subscription.
+        webhook_name:
+          type: string
+          description: The name of the webhook subscription.
+          example: Error Alerts
+        test:
+          type: boolean
+          description: Whether this is a test delivery (triggered manually via the test endpoint).
+          example: false
+        data:
+          type: object
+          description: Event-specific data.
+          properties:
+            route_id:
+              type: string
+              format: uuid
+              description: The route that processed the request.
+            route_name:
+              type: string
+              description: Name of the route.
+              example: stripe-payments
+            environment:
+              type: string
+              description: The environment the request was resolved against.
+              example: production
+            request:
+              $ref: '#/components/schemas/WebhookEventRequest'
+            response:
+              $ref: '#/components/schemas/WebhookEventResponse'
+      required:
+      - event
+      - timestamp
+      - webhook_id
+      - webhook_name
+      - data
+    WebhookEventResponse:
+      type: object
+      description: Details of the upstream response (included based on webhook configuration).
+      properties:
+        status:
+          type: integer
+          description: HTTP status code from the upstream (if `include_status_code` is enabled).
+          example: 500
+        latency_ms:
+          type: integer
+          description: Round-trip latency in milliseconds.
+          example: 245
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Response headers (if `include_headers` is enabled).
+        body:
+          description: Response body (if `include_response_body` is enabled).
+    WebhookEventRequest:
+      type: object
+      description: Details of the original proxied request (included based on webhook configuration).
+      properties:
+        method:
+          type: string
+          description: HTTP method of the request.
+          example: POST
+        path:
+          type: string
+          description: Request path.
+          example: /v1/charges
+        ip:
+          type: string
+          description: Source IP address of the caller.
+          example: 203.0.113.42
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: 'Request headers (if `include_headers` is enabled on the webhook).
+
+            Sensitive headers (Authorization, x-api-key, etc.) are automatically redacted.
+
+            '
+        body:
+          description: Request body (if `include_request_body` is enabled on the webhook).
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: 'OAuth 2.1 authentication — recommended for new integrations. Access tokens
+
+        (`kc_` prefix) are minted at the root-host token endpoint
+
+        `https://api.knoxcall.com/oauth/token` and passed as `Authorization: Bearer <access_token>`.
+
+        Public clients must use PKCE with the `authorization_code` grant; confidential
+
+        clients may use `client_credentials`. The first-party SDKs and the
+
+        `knoxcall login` CLI handle token minting, caching, refresh, and DPoP for you.
+
+        '
+      flows:
+        clientCredentials:
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+        authorizationCode:
+          authorizationUrl: https://api.knoxcall.com/oauth/authorize
+          tokenUrl: https://api.knoxcall.com/oauth/token
+          refreshUrl: https://api.knoxcall.com/oauth/token
+          scopes:
+            routes:read: Read routes.
+            routes:write: Create, update, and delete routes.
+            secrets:read: Read secret metadata. Does NOT include retrieving a live OAuth2 access token.
+            secrets:oauth_token: Retrieve a live upstream OAuth2 access token (GET /v1/secrets/{id}/oauth2/token). Distinct from secrets:read because the call refreshes the credential at the provider.
+            secrets:write: Create, update, and delete secrets.
+            vaults:detokenize: Turn a vault token back into its original value. Required by GET /v1/vaults/{vault}/tokens/{token}, by a token template reference in a /v1/proxy body, and by creating a `detokenize` route action. Distinct from vaults:read, which lists vaults and token metadata and never returns a value.
+            transit:decrypt: Open a portable `kc:` ciphertext with a tenant transit key. Required by creating a `decrypt` route action, which stores a standing instruction to open every matching field on every later request through that route. It is the same capability name the policy engine uses for POST /v1/decrypt. No routes scope satisfies it — managing a route is not permission to open the data flowing through it.
+            proxy:invoke: Call the one-shot ephemeral proxy (any method on /v1/proxy). Required for EVERY verb — the proxy is one capability behind one handler, and a bodyless GET spends an escrowed credential exactly as a POST does. Neither proxy:read nor proxy:write satisfies it.
+            clients:read: Read clients.
+            clients:write: Manage clients.
+            webhooks:write: Manage webhooks.
+            workflows:write: Manage and execute workflows.
+            '*:*': Full access (all scopes).
+    PhantomToken:
+      type: http
+      scheme: bearer
+      description: "The AI **data plane** credential — a `kp_`-prefixed capability token, not a\nManagement API credential. It is minted per agent (or per MCP resource) at\n`POST /v1/ai-gateway/agents/{agentId}/tokens`, or exchanged from a CI workload's\nOIDC token at `POST /v1/oauth/token`, and it is the ONLY credential `/v1/ai/*`\naccepts: an OAuth `kc_` access token or a `tk_` API key is refused there, and a\n`kp_` token is refused on `api.knoxcall.com`.\n\nThree header spellings are accepted, so an existing provider SDK can be pointed at\nthe agent URL without rewriting its auth:\n\n    Authorization: Bearer kp_live_a_...\n    x-api-key: kp_live_a_...\n    x-knox-ai-key: kp_live_a_...\n\n`kp_live_` is refused on the sandbox host and `kp_test_` on the Live host — the env\nsegment is enforced, not cosmetic. DPoP-bound tokens additionally require a valid\n`DPoP` proof header on every request, signed over the canonical public URL rather\nthan a rewritten `Host`.\n\nA rejected credential answers `401`/`403` in the data-plane error envelope with the\ncause in `code` and in the `X-Auth-Failure` response header.\n"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Legacy long-lived API key authentication via the Authorization header.
+
+        Pass your API key as: `Authorization: Bearer tk_xxx_yyy`.
+
+
+        Standard keys (`tk_` prefix) are accepted on `api.knoxcall.com`.
+
+        Test keys (type=test) are accepted on `sandbox.knoxcall.com`.
+
+        Enterprise Access Keys (`AKE` prefix) are accepted on both.
+
+
+        Fully supported, but prefer the `OAuth2` scheme (or the SDKs, which handle
+
+        OAuth for you) for new integrations.
+
+        '
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: 'Legacy API key authentication via the `x-api-key` header.
+
+        This is an alternative to Bearer token authentication for clients that cannot
+
+        set the `Authorization` header. Prefer the `OAuth2` scheme for new integrations.
+
+        '
+    CapabilityTokenAuth:
+      type: http
+      scheme: bearer
+      description: 'Single-use client capability token (`kct_` prefix), passed as
+
+        `Authorization: Bearer kct_...`. Minted server-side via
+
+        `POST /client-tokens` and bound either to one exact payload + action
+
+        (`decrypt`, `detokenize`) or to one vault + a closed set of page
+
+        origins (`tokenize`). This is NOT an API key — it authenticates only
+
+        the `POST /client/decrypt`, `POST /client/detokenize` and
+
+        `POST /client/tokenize` consume endpoints and is invalidated after its
+
+        first use.
+
+        '

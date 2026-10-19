@@ -1,0 +1,99 @@
+generated: '2026-10-18'
+method: derived
+source: the pre-flight dossier, apis.yml pointers, spec servers, well-known, vendors -- nothing fetched here
+generator: derive-hosts.py
+summary:
+  hosts: 5
+  own: 4
+  other_domain: 0
+  platform: 1
+  roles:
+  - api
+  - collections
+  - other
+  - portal
+  - website
+hosts:
+- host: api.knoxcall.com
+  found_by:
+  - apis[]
+  - probed
+  - contract-discovery
+  - well-known
+  types: []
+  serves:
+  - api
+  registrable_domain: knoxcall.com
+  role: api
+  relation: own
+- host: docs.knoxcall.com
+  found_by:
+  - pointer
+  - apis[]
+  - probed
+  - docs-index
+  - spec-found
+  - contract-discovery
+  - well-known
+  - vendor-detect
+  types:
+  - DeveloperPortal
+  - Documentation
+  - APIReference
+  - GettingStarted
+  - Support
+  serves:
+  - docs
+  - spec
+  - documentation
+  - hosting
+  vendor: mintlify
+  registrable_domain: knoxcall.com
+  role: portal
+  relation: own
+- host: knoxcall.com
+  found_by:
+  - pointer
+  - probed
+  - contract-discovery
+  - well-known
+  - vendor-detect
+  types:
+  - Compliance
+  - Security
+  - SDKs
+  - Website
+  - Blog
+  - Pricing
+  - TermsOfService
+  - PrivacyPolicy
+  - Roadmap
+  - SignUp
+  serves:
+  - cdn
+  vendor: cloudflare
+  registrable_domain: knoxcall.com
+  role: website
+  relation: own
+- host: sandbox-{tenant_slug}.knoxcall.com
+  found_by:
+  - probed
+  - site-links
+  - well-known
+  types: []
+  serves: []
+  registrable_domain: knoxcall.com
+  role: other
+  relation: own
+- host: www.postman.com
+  found_by:
+  - pointer
+  - vendor-detect
+  types:
+  - Postman
+  serves:
+  - api-collections
+  vendor: postman
+  registrable_domain: postman.com
+  role: collections
+  relation: platform
