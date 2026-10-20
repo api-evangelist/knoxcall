@@ -265,18 +265,48 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 components:
+  parameters:
+    EnvironmentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The environment UUID.
+      example: c9e3f0a5-4b6d-5e8c-0f1a-3b5d7c9e1f2a
   schemas:
-    RequestMeta:
+    DeletedResponse:
       type: object
-      description: Metadata included with every API response.
       properties:
-        request_id:
-          type: string
-          format: uuid
-          description: Unique identifier for this API request, useful for support and debugging.
-          example: 550e8400-e29b-41d4-a716-446655440000
+        data:
+          type: object
+          properties:
+            deleted:
+              type: boolean
+              example: true
+          required:
+          - deleted
+        meta:
+          $ref: '#/components/schemas/RequestMeta'
       required:
-      - request_id
+      - data
+      - meta
+    UpdateEnvironmentRequest:
+      type: object
+      description: All fields are optional. Only provided fields will be updated.
+      properties:
+        name:
+          type: string
+          pattern: ^[a-z0-9_-]+$
+        display_name:
+          type: string
+        description:
+          type: string
+        color:
+          type: string
+        is_default:
+          type: boolean
     Environment:
       type: object
       description: A deployment environment used to scope route configurations.
@@ -312,37 +342,17 @@ components:
           type: string
           format: date-time
           example: '2025-03-15T10:30:00.000Z'
-    DeletedResponse:
+    RequestMeta:
       type: object
+      description: Metadata included with every API response.
       properties:
-        data:
-          type: object
-          properties:
-            deleted:
-              type: boolean
-              example: true
-          required:
-          - deleted
-        meta:
-          $ref: '#/components/schemas/RequestMeta'
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
       required:
-      - data
-      - meta
-    UpdateEnvironmentRequest:
-      type: object
-      description: All fields are optional. Only provided fields will be updated.
-      properties:
-        name:
-          type: string
-          pattern: ^[a-z0-9_-]+$
-        display_name:
-          type: string
-        description:
-          type: string
-        color:
-          type: string
-        is_default:
-          type: boolean
+      - request_id
     CreateEnvironmentRequest:
       type: object
       required:
@@ -401,17 +411,65 @@ components:
           - request_id
       required:
       - error
-  parameters:
-    EnvironmentId:
-      name: id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-      description: The environment UUID.
-      example: c9e3f0a5-4b6d-5e8c-0f1a-3b5d7c9e1f2a
   responses:
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    Conflict:
+      description: A resource with the same unique identifier already exists, or the resource is in use.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: conflict
+              message: A route with this name already exists.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
     PlanLimit:
       description: 'Payment Required. The action exceeds your plan''s limits. Two `error.type` values
 
@@ -445,22 +503,6 @@ components:
               type: plan_limit
               message: Route limit reached (10). Upgrade your plan to add more.
               request_id: 550e8400-e29b-41d4-a716-446655440000
-    Conflict:
-      description: A resource with the same unique identifier already exists, or the resource is in use.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: conflict
-              message: A route with this name already exists.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
     InternalError:
       description: An unexpected server error occurred.
       headers:
@@ -476,22 +518,6 @@ components:
             error:
               type: internal_error
               message: An unexpected error occurred.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    NotFound:
-      description: The requested resource was not found.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: not_found
-              message: Route not found.
               request_id: 550e8400-e29b-41d4-a716-446655440000
     Unauthorized:
       description: Authentication is required or the provided API key is invalid.
@@ -519,43 +545,7 @@ components:
                   type: invalid_api_key
                   message: Invalid API key.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
-    ValidationError:
-      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            validation_error:
-              summary: Request body failed validation
-              value:
-                error:
-                  type: validation_error
-                  message: name and target_base_url are required.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            invalid_idempotency_key:
-              summary: Malformed idempotency key
-              value:
-                error:
-                  type: invalid_idempotency_key
-                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
   headers:
-    X-Request-Id:
-      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
-
-        to the `request_id` field in the response body. Quote it when contacting support.
-
-        '
-      schema:
-        type: string
-        format: uuid
-      example: 550e8400-e29b-41d4-a716-446655440000
     KnoxCall-Version:
       description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
 
@@ -566,6 +556,16 @@ components:
         type: string
         pattern: ^\d{4}-\d{2}-\d{2}$
       example: '2026-08-05'
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
   securitySchemes:
     OAuth2:
       type: oauth2

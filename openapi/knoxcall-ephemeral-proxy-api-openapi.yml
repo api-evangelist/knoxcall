@@ -291,17 +291,26 @@ components:
                   type: invalid_api_key
                   message: Invalid API key.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
-  headers:
-    X-Request-Id:
-      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
-
-        to the `request_id` field in the response body. Quote it when contacting support.
-
-        '
+  parameters:
+    KnoxProxyUrlHeader:
+      name: X-Knox-Proxy-URL
+      in: header
+      required: true
       schema:
         type: string
-        format: uuid
-      example: 550e8400-e29b-41d4-a716-446655440000
+        format: uri
+      description: The HTTPS upstream URL to forward the request to. Must use a DNS hostname (no IP literals).
+      example: https://api.stripe.com/v1/charges
+    KnoxTimeoutHeader:
+      name: X-Knox-Timeout-Ms
+      in: header
+      required: false
+      schema:
+        type: integer
+        maximum: 30000
+        default: 25000
+      description: Upstream timeout in milliseconds (max 30000).
+  headers:
     KnoxCall-Version:
       description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
 
@@ -312,25 +321,16 @@ components:
         type: string
         pattern: ^\d{4}-\d{2}-\d{2}$
       example: '2026-08-05'
-  parameters:
-    KnoxTimeoutHeader:
-      name: X-Knox-Timeout-Ms
-      in: header
-      required: false
-      schema:
-        type: integer
-        maximum: 30000
-        default: 25000
-      description: Upstream timeout in milliseconds (max 30000).
-    KnoxProxyUrlHeader:
-      name: X-Knox-Proxy-URL
-      in: header
-      required: true
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
       schema:
         type: string
-        format: uri
-      description: The HTTPS upstream URL to forward the request to. Must use a DNS hostname (no IP literals).
-      example: https://api.stripe.com/v1/charges
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
   schemas:
     ErrorResponse:
       type: object

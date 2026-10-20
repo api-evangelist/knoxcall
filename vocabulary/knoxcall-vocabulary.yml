@@ -1,436 +1,434 @@
-generated: '2026-10-18'
+generated: '2026-10-20'
 method: derived
 generator: derive-vocabulary.py
-source: openapi/knoxcall-openapi.json
+source:
+- openapi/knoxcall-account-api-openapi.yml
+- openapi/knoxcall-agents-api-openapi.yml
+- openapi/knoxcall-ai-gateway-api-openapi.yml
+- openapi/knoxcall-api-keys-api-openapi.yml
+- openapi/knoxcall-audit-logs-api-openapi.yml
 vocabulary:
   name: KnoxCall Domain Vocabulary
   description: 'Terms declared by KnoxCall''s own API contract: its resource groups, objects and enumerations, with the contract''s definitions.
     Derived, not authored.'
-  version: '2026-10-18'
+  version: '2026-10-20'
   terms:
-  - term: Routes
-    definition: Manage proxy routes that forward API requests to upstream targets.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Secrets
-    definition: Manage encrypted secrets injected into route headers and bodies.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Clients
-    definition: Manage authorized clients (users or servers) with IP-based access control.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Environments
-    definition: Manage deployment environments (e.g. production, staging) for route configuration overrides.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: API Keys
-    definition: Create and revoke API keys for programmatic access.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Webhooks
-    definition: Manage webhook subscriptions for real-time event notifications.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
   - term: Account
     definition: Retrieve account information and usage metrics.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Audit Logs
-    definition: Query the immutable audit trail of all API actions.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Request Logs
-    definition: The per-call proxy request log, and Merkle inclusion proofs that make an anchored entry provable to a third party.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Signup
-    definition: Headless account creation — the only unauthenticated endpoint, designed so scripts and AI agents can onboard without a browser.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: OAuth Clients
-    definition: Manage OAuth 2.1 clients used to mint access tokens for the API.
-    tags:
-    - Resource Group
-    source: openapi/knoxcall-openapi.json
+    source: openapi/knoxcall-account-api-openapi.yml
   - term: Agents
     definition: Manage BYO server agents (self-hosted data-plane / tunnel agents).
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Crypto Keys
-    definition: Transit encryption keys — encrypt, decrypt, rewrap, sign, verify, and issue JWTs without key material ever leaving KnoxCall.
+    source: openapi/knoxcall-agents-api-openapi.yml
+  - term: AI Gateway
+    definition: Manage AI egress gateways, their agents, and capability (phantom) tokens, plus cost/token spend rollups and FinOps exports.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Encryption
-    definition: Portable structure-preserving encryption — encrypt any JSON into storable `kc:` ciphertext strings and decrypt them later.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml
+  - term: API Keys
+    definition: Create and revoke API keys for programmatic access.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
+    source: openapi/knoxcall-api-keys-api-openapi.yml
+  - term: Audit Logs
+    definition: Query the immutable audit trail of all API actions.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-audit-logs-api-openapi.yml
   - term: Client Tokens
     definition: Single-use client-side capability tokens (`kct_` prefix) that let a browser exchange one bound ciphertext or vault token for its
       plaintext.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: PKI
-    definition: Private certificate authority — roots, issuing roles, leaf certificates, revocation, and CRLs.
+    source: openapi/knoxcall-client-tokens-api-openapi.yml
+  - term: Clients
+    definition: Manage authorized clients (users or servers) with IP-based access control.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
+    source: openapi/knoxcall-clients-api-openapi.yml
+  - term: Crypto Keys
+    definition: Transit encryption keys — encrypt, decrypt, rewrap, sign, verify, and issue JWTs without key material ever leaving KnoxCall.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-crypto-keys-api-openapi.yml
   - term: Dynamic DB Credentials
     definition: Just-in-time database credentials — register connections and roles, then mint short-lived leased users on demand.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Vaults
-    definition: Data tokenization vaults — swap sensitive values for format-preserving tokens and detokenize them under audit.
+    source: openapi/knoxcall-dynamic-db-credentials-api-openapi.yml
+  - term: Encryption
+    definition: Portable structure-preserving encryption — encrypt any JSON into storable `kc:` ciphertext strings and decrypt them later.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
+    source: openapi/knoxcall-encryption-api-openapi.yml
+  - term: Environments
+    definition: Manage deployment environments (e.g. production, staging) for route configuration overrides.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-environments-api-openapi.yml
   - term: Ephemeral Proxy
     definition: One-shot proxy that resolves vault-token template expressions on the wire — no pre-configured route required.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: Wrap Credentials
-    definition: Escrow a third-party provider key into KnoxCall custody so it leaves your codebase, host-pinned; the ephemeral proxy injects it
-      under X-Knox-Upstream-Auth-Secret.
+    source: openapi/knoxcall-ephemeral-proxy-api-openapi.yml
+  - term: OAuth Clients
+    definition: Manage OAuth 2.1 clients used to mint access tokens for the API.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
+    source: openapi/knoxcall-oauth-clients-api-openapi.yml
   - term: Opportunities
     definition: Suggestions to turn detected outbound API usage (agent-observed or gateway-traffic) into a durable route; accept promotes to a
       route + secret binding.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
+    source: openapi/knoxcall-opportunities-api-openapi.yml
+  - term: PKI
+    definition: Private certificate authority — roots, issuing roles, leaf certificates, revocation, and CRLs.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-pki-api-openapi.yml
+  - term: Request Logs
+    definition: The per-call proxy request log, and Merkle inclusion proofs that make an anchored entry provable to a third party.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-request-logs-api-openapi.yml
+  - term: Routes
+    definition: Manage proxy routes that forward API requests to upstream targets.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-routes-api-openapi.yml
+  - term: Secrets
+    definition: Manage encrypted secrets injected into route headers and bodies.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-secrets-api-openapi.yml
+  - term: Signup
+    definition: Headless account creation — the only unauthenticated endpoint, designed so scripts and AI agents can onboard without a browser.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-signup-api-openapi.yml
+  - term: Vaults
+    definition: Data tokenization vaults — swap sensitive values for format-preserving tokens and detokenize them under audit.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-vaults-api-openapi.yml
+  - term: Webhooks
+    definition: Manage webhook subscriptions for real-time event notifications.
+    tags:
+    - Resource Group
+    source: openapi/knoxcall-webhooks-api-openapi.yml
   - term: Workflows
     definition: Create, manage, and run workflows. Executions are asynchronous; poll executions or subscribe a webhook to workflow.execution.completed|failed.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
-  - term: AI Gateway
-    definition: Manage AI egress gateways, their agents, and capability (phantom) tokens, plus cost/token spend rollups and FinOps exports.
+    source: openapi/knoxcall-workflows-api-openapi.yml
+  - term: Wrap Credentials
+    definition: Escrow a third-party provider key into KnoxCall custody so it leaves your codebase, host-pinned; the ephemeral proxy injects it
+      under X-Knox-Upstream-Auth-Secret.
     tags:
     - Resource Group
-    source: openapi/knoxcall-openapi.json
+    source: openapi/knoxcall-wrap-credentials-api-openapi.yml
+  - term: AccountUsage
+    definition: Current billing period usage and plan limits.
+    tags:
+    - Object
+    source: openapi/knoxcall-account-api-openapi.yml#/components/schemas/AccountUsage
   - term: RequestMeta
     definition: Metadata included with every API response.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/RequestMeta
-  - term: PaginationMeta
-    definition: Pagination metadata for list endpoints.
+    source: openapi/knoxcall-account-api-openapi.yml#/components/schemas/RequestMeta
+  - term: ResourceUsage
+    definition: Usage count and limit for a resource type.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/PaginationMeta
+    source: openapi/knoxcall-account-api-openapi.yml#/components/schemas/ResourceUsage
   - term: ErrorResponse
     definition: Standard error response envelope.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/ErrorResponse
-  - term: DeletedResponse
-    definition: 'Object declared by the contract with fields: data, meta.'
+    source: openapi/knoxcall-account-api-openapi.yml#/components/schemas/ErrorResponse
+  - term: Agent
+    definition: A BYO server agent registration.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/DeletedResponse
-  - term: EgressObservation
-    definition: One (host, first path segment, method, credential header NAME) key the SDK's interceptor saw a credential leave for without interception,
-      with how often and when. Never a credential value, a full path, a query string or a body — the server drops an entry carrying any of those.
+    source: openapi/knoxcall-agents-api-openapi.yml#/components/schemas/Agent
+  - term: AgentTamperEvent
+    definition: A recorded tamper event (unverified build, signature mismatch) for an agent.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/EgressObservation
-  - term: EgressObservationBatch
-    definition: POST /wrap/egress-observations request body.
+    source: openapi/knoxcall-agents-api-openapi.yml#/components/schemas/AgentTamperEvent
+  - term: AgentCreated
+    definition: The newly registered agent, including its one-time secret.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/EgressObservationBatch
-  - term: EgressObservationReceipt
-    definition: What happened to the batch. `accepted + dropped` equals the number of observations sent.
+    source: openapi/knoxcall-agents-api-openapi.yml#/components/schemas/AgentCreated
+  - term: MintAiGatewayTokenRequest
+    definition: 'Object declared by the contract with fields: name, kind, dpop_required, dpop_jkt, expires_in_seconds.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/EgressObservationReceipt
-  - term: InterceptManifest
-    definition: GET /wrap/intercept-manifest. Which upstream hosts an intercept-enabled Route covers for one environment of this space.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/MintAiGatewayTokenRequest
+  - term: CreateAiGatewayMcpServerRequest
+    definition: 'Object declared by the contract with fields: name, slug, description, server_type, transport, upstream_url, allowed_tools, pii_inspection,
+      auth, pii_redact_policy_id, firewall_policy_id, guardrail_webhook_url. (4 more)'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/InterceptManifest
-  - term: RouteSummary
-    definition: Summary representation of a route returned in list responses.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/CreateAiGatewayMcpServerRequest
+  - term: AiGatewayPhantomToken
+    definition: A capability (phantom) token row. The plaintext is never returned here — only at mint time.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/RouteSummary
-  - term: Route
-    definition: Full route row as returned after create or update operations. Runtime injection/rate-limit configuration lives in the per-environment
-      configs (see `GET /routes/{id}/environments`), not on this row.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayPhantomToken
+  - term: AiGatewayPiiRecognizer
+    definition: One tenant-defined PII detector.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/Route
-  - term: RouteDetail
-    definition: Route detail as returned by `GET /routes/{id}`. The `payload_structure`, `injection_rules`, `ip_allowlist`, and `data_plane_node_id`
-      fields are present only when the route has a base-environment configuration row. `injection_rules` is deprecated and is applied to no request
-      — see the field's own description.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayPiiRecognizer
+  - term: UpdateAiGatewayRequest
+    definition: Only the provided fields are changed.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/RouteDetail
-  - term: CreateRouteRequest
-    definition: 'Object declared by the contract with fields: name, slug, target_base_url, base_environment, inject_headers_json, inject_body_json,
-      injection_rules, ip_allowlist, method_configs, collection_id.'
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/UpdateAiGatewayRequest
+  - term: AiGatewayRoutingPolicy
+    definition: How this agent retries and spreads load (AIGW-42). An empty object — the default for every agent — means one attempt per route
+      and fail-over to `fallback_route_ids` on 5xx only, which is the behaviour the gateway has always had. Every field is clamped server-side.
+      A request parked waiting to retry occupies an API worker, so `max_attempts` caps at 5, any single delay at 30s, a honoured `Retry-After
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateRouteRequest
-  - term: UpdateRouteRequest
-    definition: All fields are optional. Only provided fields will be updated.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayRoutingPolicy
+  - term: AiGatewayPhantomTokenCreated
+    definition: The mint result. `token` is the plaintext capability token and is shown exactly once.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/UpdateRouteRequest
-  - term: RouteEnvironmentConfig
-    definition: Environment-specific configuration override for a route.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayPhantomTokenCreated
+  - term: AiGatewayUsageExportRow
+    definition: 'Object declared by the contract with fields: group, requests, input_tokens, output_tokens, cost_usd, unpriced_requests.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/RouteEnvironmentConfig
-  - term: RouteEnvironmentConfigInput
-    definition: Fields for creating or updating an environment override. All fields are optional; only provided fields are set. Existing fields
-      not included in the request are preserved.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayUsageExportRow
+  - term: AiGatewayUsageByModel
+    definition: 'Object declared by the contract with fields: provider, model, requests, input_tokens, output_tokens, cost_usd, unpriced_requests.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/RouteEnvironmentConfigInput
-  - term: RequestLog
-    definition: A record of a proxied API request. On `GET /logs` the fields `id`, `request_id`, `tenant_id`, `route_id`, `matched_client_id`,
-      `identification_method`, `method`, `status_code`, `src_ip`, `environment`, `sandbox` and `ts` are exactly what the Merkle anchor commits
-      to, in that order - see `GET /logs/{request_id}/proof`. Every other field is operational detail and is NOT part of the leaf.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayUsageByModel
+  - term: AiGatewayFirewallTestResult
+    definition: 'Object declared by the contract with fields: matched, matches, skipped.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/RequestLog
-  - term: Opportunity
-    definition: A promotion suggestion (agent_monitor or gateway_traffic source).
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayFirewallTestResult
+  - term: AiGatewayTokenExchangeRequest
+    definition: RFC 8693 token-exchange request for `POST /v1/oauth/token`. Sent as `application/x-www-form-urlencoded` (RFC 6749) or `application/json`.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/Opportunity
-  - term: Secret
-    definition: Secret metadata. Secret values are never returned by the API. Reference secrets in route injection configs using `{{SECRET_NAME}}`
-      syntax.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayTokenExchangeRequest
+  - term: AiGatewayMcpTool
+    definition: A tool metadata row. It does not widen what the server advertises — that is the intersection of `allowed_tools`, the upstream's
+      real tools and the token's tool scope.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/Secret
-  - term: SecretEnvironmentVersion
-    definition: Per-environment metadata for a secret. Returned by `GET /secrets/{id}`; never contains the value.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayMcpTool
+  - term: AiGatewayMcpAuth
+    definition: 'Upstream auth for an MCP server. A secret reference is the only supported path: every header value must contain a `{{secret_id:}}`
+      (or legacy `{{secret:}}`) placeholder. A literal is refused with 422 `plaintext_auth` — it would sit in cleartext in the control plane.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/SecretEnvironmentVersion
-  - term: SecretDetail
-    definition: A secret plus its per-environment metadata. Returned by `GET /secrets/{id}`; the list endpoint returns the base `Secret` shape.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayMcpAuth
+  - term: UpdateAiGatewayAgentRequest
+    definition: Only the provided fields are changed. Every writable column on an agent appears here — this schema is what the typed SDKs are
+      generated and reviewed against, so a field missing from it becomes a field missing from them (AIGW-161).
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/SecretDetail
-  - term: OAuth2Token
-    definition: An auto-refreshing OAuth2 access token retrieved from an OAuth2-type secret.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/UpdateAiGatewayAgentRequest
+  - term: AiGatewayFirewallRule
+    definition: One heuristic rule inside a firewall policy.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/OAuth2Token
-  - term: CreateSecretRequest
-    definition: 'Creates a secret. Set `secret_type` to choose the variant: - `string` (default) — requires `name` and `value` - `oauth2` — requires
-      OAuth2 fields (see `CreateOAuth2SecretRequest`) - `certificate` — requires certificate fields (see `CreateCertificateSecretRequest`)'
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayFirewallRule
+  - term: AiGatewayMcpServer
+    definition: An MCP server KnoxCall proxies and governs. `connect_url` and `resource` are deliberately different values — see their descriptions.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateSecretRequest
-  - term: CreateOAuth2SecretRequest
-    definition: 'Object declared by the contract with fields: secret_type, name, provider, client_id, client_secret, grant_type, scopes, auth_url,
-      token_url, username, password, mtls_certificate_id. (1 more)'
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayMcpServer
+  - term: AiGatewayUsage
+    definition: Cost and token rollup by model over the requested period.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateOAuth2SecretRequest
-  - term: OAuth2SecretCreated
-    definition: Response after creating an OAuth2 secret.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayUsage
+  - term: AiGatewayDataPlaneError
+    definition: 'AIGW-163 — the ONE error envelope of the AI data plane, served by `/v1/ai/*` and by every layer in front of it (authentication,
+      the audience guard, the rate limiter, the boot sentinel). It is NOT the `{error: {type, message, request_id}}` envelope the rest of `/v1`
+      uses. That one belongs to the Management API, which is a different plane with a different credential; this one is what a governed prox'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/OAuth2SecretCreated
-  - term: CreateCertificateSecretRequest
-    definition: 'Object declared by the contract with fields: secret_type, name, certificate_content, private_key, passphrase, certificate_type,
-      collection_id.'
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayDataPlaneError
+  - term: AiGatewayPiiRecognizerTestResult
+    definition: 'Object declared by the contract with fields: matched, matches.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateCertificateSecretRequest
-  - term: CertificateSecretCreated
-    definition: Response after creating a certificate secret.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayPiiRecognizerTestResult
+  - term: AiGatewayUsageExport
+    definition: FinOps showback/chargeback rollup, aggregated by the requested dimension.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CertificateSecretCreated
-  - term: Client
-    definition: An authorized client (user or server) with IP-based access control.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayUsageExport
+  - term: AiGatewayPiiRecognizerUpdate
+    definition: Partial. The server validates the MERGED state, not the patch — `pattern`, `kind` and `action` together decide whether a pattern
+      is compiled and how the detector is ranked.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/Client
-  - term: ClientDetail
-    definition: Extended client object with route assignments.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayPiiRecognizerUpdate
+  - term: AiGatewayAgent
+    definition: An agent under a gateway — the addressable unit an AI SDK points at.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/ClientDetail
-  - term: ClientFull
-    definition: Full client row as returned by create and update operations.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayAgent
+  - term: AiGatewayUsageTotals
+    definition: 'Object declared by the contract with fields: requests, input_tokens, output_tokens, cost_usd, unpriced_requests.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/ClientFull
-  - term: CreateClientRequest
-    definition: 'Object declared by the contract with fields: name, type, ip_address, description.'
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayUsageTotals
+  - term: AiGatewayMcpGrant
+    definition: One person's delegated-OAuth connection to an MCP server (AIGW-190). Never carries the stored tokens.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateClientRequest
-  - term: UpdateClientRequest
-    definition: All fields are optional. Only provided fields will be updated.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayMcpGrant
+  - term: CreateAiGatewayRequest
+    definition: 'Object declared by the contract with fields: name, slug, description, budget_daily_usd, budget_monthly_usd, budget_overage_action.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/UpdateClientRequest
-  - term: Environment
-    definition: A deployment environment used to scope route configurations.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/CreateAiGatewayRequest
+  - term: OAuthError
+    definition: OAuth 2.1 error response (RFC 6749 §5.2). The OAuth endpoints use this shape rather than the /v1 `ErrorResponse` envelope.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/Environment
-  - term: CreateEnvironmentRequest
-    definition: 'Object declared by the contract with fields: name, display_name, description, color, is_default.'
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/OAuthError
+  - term: AiGatewayPiiRecognizerCreate
+    definition: 'Object declared by the contract with fields: name, kind, pattern, context_words, confidence, action, format, enabled.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateEnvironmentRequest
-  - term: UpdateEnvironmentRequest
-    definition: All fields are optional. Only provided fields will be updated.
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayPiiRecognizerCreate
+  - term: PaginationMeta
+    definition: Pagination metadata for list endpoints.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/UpdateEnvironmentRequest
-  - term: ApiKey
-    definition: An API key (masked -- full key is only returned at creation time).
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/PaginationMeta
+  - term: AiGatewayPiiPolicy
+    definition: A tenant-scoped bundle of PII recognizers plus a default action, attached to an agent through `pii_redact_policy_id`.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/ApiKey
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayPiiPolicy
+  - term: CreateAiGatewayAgentRequest
+    definition: 'Object declared by the contract with fields: name, slug, description, primary_route_id, provider, upstream_secret_id, upstream,
+      default_model, model_allowlist, model_denylist, budget_daily_usd, budget_monthly_usd. (29 more)'
+    tags:
+    - Object
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/CreateAiGatewayAgentRequest
+  - term: AiGatewayTokenExchangeResponse
+    definition: RFC 8693 §2.2.1 response. This is a bare OAuth body, NOT the `{data, meta}` envelope the rest of `/v1` returns — an OAuth client
+      parses this shape.
+    tags:
+    - Object
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayTokenExchangeResponse
+  - term: AiGatewayFirewallPolicyCreate
+    definition: 'Object declared by the contract with fields: name, heuristics, canary_enabled, action.'
+    tags:
+    - Object
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayFirewallPolicyCreate
+  - term: AiGatewayFirewallPolicy
+    definition: A tenant-scoped prompt-firewall policy, attachable to agents and MCP servers.
+    tags:
+    - Object
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayFirewallPolicy
+  - term: AiGatewayPiiPolicyCreate
+    definition: 'Object declared by the contract with fields: name, recognizer_ids, default_action, description.'
+    tags:
+    - Object
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGatewayPiiPolicyCreate
+  - term: UpdateAiGatewayMcpServerRequest
+    definition: 'Object declared by the contract with fields: name, description, upstream_url, transport, allowed_tools, pii_inspection, auth,
+      status, pii_redact_policy_id, firewall_policy_id, guardrail_webhook_url, guardrail_webhook_secret_id. (3 more)'
+    tags:
+    - Object
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/UpdateAiGatewayMcpServerRequest
+  - term: AiGateway
+    definition: An AI gateway — the top-level container that agents are created under.
+    tags:
+    - Object
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/AiGateway
+  - term: UpsertAiGatewayMcpToolRequest
+    definition: 'Object declared by the contract with fields: tool_name, description, input_schema, enabled.'
+    tags:
+    - Object
+    source: openapi/knoxcall-ai-gateway-api-openapi.yml#/components/schemas/UpsertAiGatewayMcpToolRequest
   - term: ApiKeyCreated
     definition: API key creation response. The `api_key` field contains the full key and is **only returned once** at creation time. Store it
       securely.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/ApiKeyCreated
-  - term: CreateApiKeyRequest
-    definition: 'Object declared by the contract with fields: name, rate_limit_requests, rate_limit_window_sec, expires_in_days, expires_at, never_expires,
-      role_ids.'
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateApiKeyRequest
+    source: openapi/knoxcall-api-keys-api-openapi.yml#/components/schemas/ApiKeyCreated
   - term: Role
     definition: 'A named bundle of permission policies. Read-only on `/v1`, and exposed so a machine can discover the id to pass in `role_ids`.
       The seeded roles (`seeded: true`) are platform-managed and cannot be renamed or recomposed; custom roles are being retired in favour of
       fixed roles and per-key permissions, so no new custom role can be created and only a seeded key role can be given to a new key. The rules'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/Role
-  - term: WebhookSummary
-    definition: Summary representation of a webhook returned in list responses.
+    source: openapi/knoxcall-api-keys-api-openapi.yml#/components/schemas/Role
+  - term: CreateApiKeyRequest
+    definition: 'Object declared by the contract with fields: name, rate_limit_requests, rate_limit_window_sec, expires_in_days, expires_at, never_expires,
+      role_ids.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/WebhookSummary
-  - term: WebhookDetail
-    definition: 'Full webhook object with all configuration fields and delivery statistics. Credential material is never returned: `secret_key`,
-      `auth_config` and `request_headers` are all accepted on create/update and all omitted from this response. `request_headers` is credential
-      material because the dispatcher spreads it into the outbound header map alongside the `auth_config`-derived `Authorization`, so a valu'
+    source: openapi/knoxcall-api-keys-api-openapi.yml#/components/schemas/CreateApiKeyRequest
+  - term: ApiKey
+    definition: An API key (masked -- full key is only returned at creation time).
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/WebhookDetail
-  - term: WebhookCreated
-    definition: Webhook creation response, including the one-time signing secret.
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/WebhookCreated
-  - term: WebhookUpdated
-    definition: Webhook update response (no secret or delivery-stat fields).
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/WebhookUpdated
-  - term: CreateWebhookRequest
-    definition: 'Object declared by the contract with fields: name, description, url, method, event_types, auth_type, auth_config, request_headers,
-      route_filter, include_request_body, include_response_body, include_headers. (7 more)'
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateWebhookRequest
-  - term: UpdateWebhookRequest
-    definition: All fields are optional. Only provided fields will be updated.
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/UpdateWebhookRequest
-  - term: WebhookLog
-    definition: A record of a webhook delivery attempt.
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/WebhookLog
-  - term: VaultTokenExpiringEventPayload
-    definition: 'Payload delivered for the `vault.token.expiring` event — Card-Grade Vaults. Signed exactly like every other webhook delivery.
-      It carries the TOKEN (the format-preserving alias you already store) and never the card number, and there is no field that could hold one:
-      a delivery whose contents were card-shaped is refused server-side rather than sent.'
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/VaultTokenExpiringEventPayload
-  - term: WebhookEventPayload
-    definition: Payload delivered to webhook endpoints when events are triggered. All payloads are signed with HMAC-SHA256 using the webhook's
-      `secret_key`. The signature is sent in the `X-KnoxCall-Signature` header.
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/WebhookEventPayload
-  - term: WebhookEventRequest
-    definition: Details of the original proxied request (included based on webhook configuration).
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/WebhookEventRequest
-  - term: WebhookEventResponse
-    definition: Details of the upstream response (included based on webhook configuration).
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/WebhookEventResponse
-  - term: AccountUsage
-    definition: Current billing period usage and plan limits.
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/AccountUsage
-  - term: ResourceUsage
-    definition: Usage count and limit for a resource type.
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/ResourceUsage
-  - term: RequestLogProof
-    definition: A Merkle inclusion proof for one request log row, or a named reason why one cannot be produced. Carries every field of `RequestLog`
-      in addition to those below.
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/RequestLogProof
+    source: openapi/knoxcall-api-keys-api-openapi.yml#/components/schemas/ApiKey
   - term: AuditLog
     definition: An immutable record of an action performed via the API.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/AuditLog
-  - term: RouteAction
-    definition: A declarative field-level action the proxy applies to a route's traffic on the wire.
+    source: openapi/knoxcall-audit-logs-api-openapi.yml#/components/schemas/AuditLog
+  - term: UpdateClientRequest
+    definition: All fields are optional. Only provided fields will be updated.
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/RouteAction
-  - term: CreateRouteActionRequest
-    definition: 'Object declared by the contract with fields: direction, action, selectors, key_name, data_role, content_type, sort_order.'
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateRouteActionRequest
-  - term: ClientCredential
-    definition: A credential attached to a client. Secret material (HMAC secrets, private keys) is redacted from `data`.
-    tags:
-    - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/ClientCredential
+    source: openapi/knoxcall-clients-api-openapi.yml#/components/schemas/UpdateClientRequest
   - term: CreateClientCredentialRequest
     definition: 'Object declared by the contract with fields: kind, label, data.'
     tags:
     - Object
-    source: openapi/knoxcall-openapi.json#/components/schemas/CreateClientCredentialRequest
+    source: openapi/knoxcall-clients-api-openapi.yml#/components/schemas/CreateClientCredentialRequest
+  - term: ClientCredential
+    definition: A credential attached to a client. Secret material (HMAC secrets, private keys) is redacted from `data`.
+    tags:
+    - Object
+    source: openapi/knoxcall-clients-api-openapi.yml#/components/schemas/ClientCredential
+  - term: DeletedResponse
+    definition: 'Object declared by the contract with fields: data, meta.'
+    tags:
+    - Object
+    source: openapi/knoxcall-clients-api-openapi.yml#/components/schemas/DeletedResponse
+  - term: ClientFull
+    definition: Full client row as returned by create and update operations.
+    tags:
+    - Object
+    source: openapi/knoxcall-clients-api-openapi.yml#/components/schemas/ClientFull
+  - term: ClientDetail
+    definition: Extended client object with route assignments.
+    tags:
+    - Object
+    source: openapi/knoxcall-clients-api-openapi.yml#/components/schemas/ClientDetail
+  - term: CreateClientRequest
+    definition: 'Object declared by the contract with fields: name, type, ip_address, description.'
+    tags:
+    - Object
+    source: openapi/knoxcall-clients-api-openapi.yml#/components/schemas/CreateClientRequest
+  - term: Client
+    definition: An authorized client (user or server) with IP-based access control.
+    tags:
+    - Object
+    source: openapi/knoxcall-clients-api-openapi.yml#/components/schemas/Client

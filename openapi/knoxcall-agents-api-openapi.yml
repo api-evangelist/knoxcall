@@ -300,143 +300,65 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 components:
-  schemas:
-    Agent:
-      type: object
-      description: A BYO server agent registration.
-      properties:
-        id:
-          type: string
-          format: uuid
-          example: 6d4a1b2c-3e5f-4a6b-8c7d-9e0f1a2b3c4d
-        name:
-          type: string
-          example: prod-vpc-tunnel
-        agent_id:
-          type: string
-          description: Public agent identifier (`kc_agent_` prefix) the agent presents when opening sessions.
-          example: kc_agent_3f9a1b2c4d5e
-        status:
-          type: string
-          enum:
-          - active
-          - revoked
-        require_verified_build:
-          type: boolean
-          description: Whether sessions are refused for unverified agent builds.
-        last_seen_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        last_session_issued_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        created_at:
-          type: string
-          format: date-time
-          example: '2025-03-15T10:30:00.000Z'
-        has_tamper_events:
-          type: boolean
-          description: Whether any tamper events have been recorded for this agent.
-    RequestMeta:
-      type: object
-      description: Metadata included with every API response.
-      properties:
-        request_id:
-          type: string
-          format: uuid
-          description: Unique identifier for this API request, useful for support and debugging.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - request_id
-    AgentTamperEvent:
-      type: object
-      description: A recorded tamper event (unverified build, signature mismatch) for an agent.
-      properties:
-        id:
-          type: string
-          format: uuid
-        version_reported:
-          type:
-          - string
-          - 'null'
-          description: Agent version string reported at session time.
-        build_sig_reported:
-          type:
-          - string
-          - 'null'
-          description: Build signature the agent reported.
-        src_ip:
-          type:
-          - string
-          - 'null'
-          description: Source IP of the offending session attempt.
-        action_taken:
-          type:
-          - string
-          - 'null'
-          description: What KnoxCall did in response (e.g. session refused).
-        detected_at:
-          type: string
-          format: date-time
-          example: '2025-03-15T10:30:00.000Z'
-    AgentCreated:
-      type: object
-      description: The newly registered agent, including its one-time secret.
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-          example: prod-vpc-tunnel
-        agent_id:
-          type: string
-          example: kc_agent_3f9a1b2c4d5e
-        status:
-          type: string
-          enum:
-          - active
-          - revoked
-          example: active
-        require_verified_build:
-          type: boolean
-        created_at:
-          type: string
-          format: date-time
-        agent_secret:
-          type: string
-          description: '**Shown exactly once** — only a hash is stored, so it can never be retrieved again. 64 hex characters.'
-    ErrorResponse:
-      type: object
-      description: Standard error response envelope.
-      properties:
-        error:
-          type: object
-          properties:
-            type:
-              type: string
-              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
-              example: validation_error
-            message:
-              type: string
-              description: Human-readable error message.
-              example: name and target_base_url are required.
-            request_id:
-              type: string
-              format: uuid
-              description: Unique identifier for this request.
-              example: 550e8400-e29b-41d4-a716-446655440000
-          required:
-          - type
-          - message
-          - request_id
-      required:
-      - error
   responses:
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    InternalError:
+      description: An unexpected server error occurred.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: internal_error
+              message: An unexpected error occurred.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
     PlanLimit:
       description: 'Payment Required. The action exceeds your plan''s limits. Two `error.type` values
 
@@ -509,38 +431,6 @@ components:
                   type: system_client_protected
                   message: This client is managed by the platform and cannot be modified.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
-    InternalError:
-      description: An unexpected server error occurred.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: internal_error
-              message: An unexpected error occurred.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    NotFound:
-      description: The requested resource was not found.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: not_found
-              message: Route not found.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
     Unauthorized:
       description: Authentication is required or the provided API key is invalid.
       headers:
@@ -567,43 +457,143 @@ components:
                   type: invalid_api_key
                   message: Invalid API key.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
-    ValidationError:
-      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            validation_error:
-              summary: Request body failed validation
-              value:
-                error:
-                  type: validation_error
-                  message: name and target_base_url are required.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            invalid_idempotency_key:
-              summary: Malformed idempotency key
-              value:
-                error:
-                  type: invalid_idempotency_key
-                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  schemas:
+    Agent:
+      type: object
+      description: A BYO server agent registration.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 6d4a1b2c-3e5f-4a6b-8c7d-9e0f1a2b3c4d
+        name:
+          type: string
+          example: prod-vpc-tunnel
+        agent_id:
+          type: string
+          description: Public agent identifier (`kc_agent_` prefix) the agent presents when opening sessions.
+          example: kc_agent_3f9a1b2c4d5e
+        status:
+          type: string
+          enum:
+          - active
+          - revoked
+        require_verified_build:
+          type: boolean
+          description: Whether sessions are refused for unverified agent builds.
+        last_seen_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        last_session_issued_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+        has_tamper_events:
+          type: boolean
+          description: Whether any tamper events have been recorded for this agent.
+    AgentCreated:
+      type: object
+      description: The newly registered agent, including its one-time secret.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: prod-vpc-tunnel
+        agent_id:
+          type: string
+          example: kc_agent_3f9a1b2c4d5e
+        status:
+          type: string
+          enum:
+          - active
+          - revoked
+          example: active
+        require_verified_build:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        agent_secret:
+          type: string
+          description: '**Shown exactly once** — only a hash is stored, so it can never be retrieved again. 64 hex characters.'
+    RequestMeta:
+      type: object
+      description: Metadata included with every API response.
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    AgentTamperEvent:
+      type: object
+      description: A recorded tamper event (unverified build, signature mismatch) for an agent.
+      properties:
+        id:
+          type: string
+          format: uuid
+        version_reported:
+          type:
+          - string
+          - 'null'
+          description: Agent version string reported at session time.
+        build_sig_reported:
+          type:
+          - string
+          - 'null'
+          description: Build signature the agent reported.
+        src_ip:
+          type:
+          - string
+          - 'null'
+          description: Source IP of the offending session attempt.
+        action_taken:
+          type:
+          - string
+          - 'null'
+          description: What KnoxCall did in response (e.g. session refused).
+        detected_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
   headers:
-    X-Request-Id:
-      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
-
-        to the `request_id` field in the response body. Quote it when contacting support.
-
-        '
-      schema:
-        type: string
-        format: uuid
-      example: 550e8400-e29b-41d4-a716-446655440000
     KnoxCall-Version:
       description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
 
@@ -614,6 +604,16 @@ components:
         type: string
         pattern: ^\d{4}-\d{2}-\d{2}$
       example: '2026-08-05'
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
   securitySchemes:
     OAuth2:
       type: oauth2

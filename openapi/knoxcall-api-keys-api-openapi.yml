@@ -445,158 +445,6 @@ paths:
           $ref: '#/components/responses/InternalError'
 components:
   schemas:
-    ApiKeyCreated:
-      type: object
-      description: 'API key creation response. The `api_key` field contains the full key and is
-
-        **only returned once** at creation time. Store it securely.
-
-        '
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: 'Internal UUID of the key record — the value `DELETE /v1/api-keys/{id}` and
-
-            role assignments reference. Added 2026-08-09; previously the create response
-
-            carried no UUID at all, so a caller had to list keys back to find it.
-
-            '
-          example: f0a1b2c3-d4e5-6f7a-8b9c-0d1e2f3a4b5c
-        role_ids:
-          type: array
-          description: 'The role UUIDs actually attached, in the same transaction as the key. Empty
-
-            when none were requested — which means the key is default-denied on every
-
-            policy-gated endpoint.
-
-            '
-          items:
-            type: string
-            format: uuid
-          example:
-          - b3f1c2d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
-        key_id:
-          type: string
-          description: Public key identifier prefix.
-          example: tk_a1b2c3
-        api_key:
-          type: string
-          description: 'The full API key. **This is the only time it will be shown.** Store it
-
-            in a secure location immediately.
-
-            '
-          example: tk_a1b2c3_xYz9AbCdEfGhIjKlMnOpQrStUvWx
-        key_prefix:
-          type: string
-          description: First characters of the key for identification.
-          example: tk_a1b2c3_xY
-        key_type:
-          type: string
-          enum:
-          - standard
-          - test
-          description: Key type determined by which API host the key was created on.
-          example: standard
-        name:
-          type: string
-          description: Name you assigned to the key.
-          example: CI/CD Pipeline
-        expires_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: 'When the new key stops authenticating, resolved from whichever of
-
-            `expires_in_days` / `expires_at` / `never_expires` you sent. `null` means it
-
-            never expires.
-
-
-            **Sending none of the three puts this 90 days out**, so read this field back
-
-            even when you did not ask for an expiry — it is the value that was actually
-
-            applied, not an echo of your request.
-
-            '
-          example: '2025-06-13T10:30:00.000Z'
-        message:
-          type: string
-          description: Reminder to store the key securely.
-          example: Store this API key securely. It will not be shown again.
-    ErrorResponse:
-      type: object
-      description: Standard error response envelope.
-      properties:
-        error:
-          type: object
-          properties:
-            type:
-              type: string
-              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
-              example: validation_error
-            message:
-              type: string
-              description: Human-readable error message.
-              example: name and target_base_url are required.
-            request_id:
-              type: string
-              format: uuid
-              description: Unique identifier for this request.
-              example: 550e8400-e29b-41d4-a716-446655440000
-          required:
-          - type
-          - message
-          - request_id
-      required:
-      - error
-    PaginationMeta:
-      type: object
-      description: Pagination metadata for list endpoints.
-      properties:
-        total:
-          type: integer
-          description: Total number of records matching the query.
-          example: 42
-        page:
-          type: integer
-          description: Current page number.
-          example: 1
-        per_page:
-          type: integer
-          description: Number of records per page.
-          example: 20
-        total_pages:
-          type: integer
-          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
-          example: 3
-        request_id:
-          type: string
-          format: uuid
-          description: Unique identifier for this API request.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - total
-      - page
-      - per_page
-      - total_pages
-      - request_id
-    RequestMeta:
-      type: object
-      description: Metadata included with every API response.
-      properties:
-        request_id:
-          type: string
-          format: uuid
-          description: Unique identifier for this API request, useful for support and debugging.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - request_id
     Role:
       type: object
       description: 'A named bundle of permission policies. Read-only on `/v1`, and exposed so a machine
@@ -647,6 +495,159 @@ components:
           type: boolean
           description: True for roles the platform creates and maintains (they cannot be deleted, renamed or recomposed). Only a seeded key role is accepted in `role_ids`; custom roles (`false`) are being retired.
           example: true
+    ApiKey:
+      type: object
+      description: An API key (masked -- full key is only returned at creation time).
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Internal UUID of the key record.
+          example: f0a1b2c3-d4e5-6f7a-8b9c-0d1e2f3a4b5c
+        key_id:
+          type: string
+          description: Public key identifier prefix (e.g. `tk_a1b2c3`).
+          example: tk_a1b2c3
+        key_prefix:
+          type: string
+          description: First few characters of the key for identification.
+          example: tk_a1b2c3_xY
+        key_type:
+          type: string
+          enum:
+          - standard
+          - test
+          - access_key
+          description: 'Type of the API key. `standard` keys work on the production API,
+
+            `test` keys work on the sandbox API, `access_key` keys work on both.
+
+            '
+          example: standard
+        name:
+          type: string
+          description: Human-readable name for the key.
+          example: CI/CD Pipeline
+        active:
+          type: boolean
+          description: Whether the key is active (false if revoked).
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Timestamp of the last time this key was used.
+          example: '2025-03-16T14:22:00.000Z'
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 'When this key stops authenticating. `null` means it **never expires** — it stays
+
+            valid until someone revokes it by hand.
+
+
+            Expiry is enforced on every authentication path, so a key past this instant is
+
+            `401` everywhere, with no way to extend it: an expired key is replaced, not
+
+            renewed.
+
+
+            **A key created without an explicit expiry choice gets 90 days.** That default
+
+            is applied when the key is minted, so this field is the only place it is
+
+            visible — read it on every key, including ones you did not create.
+
+            '
+          example: '2025-06-13T10:30:00.000Z'
+        rate_limit_requests:
+          type:
+          - integer
+          - 'null'
+          description: Maximum requests allowed per rate limit window.
+          example: 1000
+        rate_limit_window_sec:
+          type:
+          - integer
+          - 'null'
+          description: Rate limit window duration in seconds.
+          example: 60
+    RequestMeta:
+      type: object
+      description: Metadata included with every API response.
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    PaginationMeta:
+      type: object
+      description: Pagination metadata for list endpoints.
+      properties:
+        total:
+          type: integer
+          description: Total number of records matching the query.
+          example: 42
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        per_page:
+          type: integer
+          description: Number of records per page.
+          example: 20
+        total_pages:
+          type: integer
+          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
+          example: 3
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - total
+      - page
+      - per_page
+      - total_pages
+      - request_id
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
     CreateApiKeyRequest:
       type: object
       required:
@@ -768,199 +769,91 @@ components:
             format: uuid
           example:
           - b3f1c2d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
-    ApiKey:
+    ApiKeyCreated:
       type: object
-      description: An API key (masked -- full key is only returned at creation time).
+      description: 'API key creation response. The `api_key` field contains the full key and is
+
+        **only returned once** at creation time. Store it securely.
+
+        '
       properties:
         id:
           type: string
           format: uuid
-          description: Internal UUID of the key record.
+          description: 'Internal UUID of the key record — the value `DELETE /v1/api-keys/{id}` and
+
+            role assignments reference. Added 2026-08-09; previously the create response
+
+            carried no UUID at all, so a caller had to list keys back to find it.
+
+            '
           example: f0a1b2c3-d4e5-6f7a-8b9c-0d1e2f3a4b5c
+        role_ids:
+          type: array
+          description: 'The role UUIDs actually attached, in the same transaction as the key. Empty
+
+            when none were requested — which means the key is default-denied on every
+
+            policy-gated endpoint.
+
+            '
+          items:
+            type: string
+            format: uuid
+          example:
+          - b3f1c2d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d
         key_id:
           type: string
-          description: Public key identifier prefix (e.g. `tk_a1b2c3`).
+          description: Public key identifier prefix.
           example: tk_a1b2c3
+        api_key:
+          type: string
+          description: 'The full API key. **This is the only time it will be shown.** Store it
+
+            in a secure location immediately.
+
+            '
+          example: tk_a1b2c3_xYz9AbCdEfGhIjKlMnOpQrStUvWx
         key_prefix:
           type: string
-          description: First few characters of the key for identification.
+          description: First characters of the key for identification.
           example: tk_a1b2c3_xY
         key_type:
           type: string
           enum:
           - standard
           - test
-          - access_key
-          description: 'Type of the API key. `standard` keys work on the production API,
-
-            `test` keys work on the sandbox API, `access_key` keys work on both.
-
-            '
+          description: Key type determined by which API host the key was created on.
           example: standard
         name:
           type: string
-          description: Human-readable name for the key.
+          description: Name you assigned to the key.
           example: CI/CD Pipeline
-        active:
-          type: boolean
-          description: Whether the key is active (false if revoked).
-          example: true
-        created_at:
-          type: string
-          format: date-time
-          example: '2025-03-15T10:30:00.000Z'
-        last_used_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: Timestamp of the last time this key was used.
-          example: '2025-03-16T14:22:00.000Z'
         expires_at:
           type:
           - string
           - 'null'
           format: date-time
-          description: 'When this key stops authenticating. `null` means it **never expires** — it stays
+          description: 'When the new key stops authenticating, resolved from whichever of
 
-            valid until someone revokes it by hand.
+            `expires_in_days` / `expires_at` / `never_expires` you sent. `null` means it
 
-
-            Expiry is enforced on every authentication path, so a key past this instant is
-
-            `401` everywhere, with no way to extend it: an expired key is replaced, not
-
-            renewed.
+            never expires.
 
 
-            **A key created without an explicit expiry choice gets 90 days.** That default
+            **Sending none of the three puts this 90 days out**, so read this field back
 
-            is applied when the key is minted, so this field is the only place it is
+            even when you did not ask for an expiry — it is the value that was actually
 
-            visible — read it on every key, including ones you did not create.
+            applied, not an echo of your request.
 
             '
           example: '2025-06-13T10:30:00.000Z'
-        rate_limit_requests:
-          type:
-          - integer
-          - 'null'
-          description: Maximum requests allowed per rate limit window.
-          example: 1000
-        rate_limit_window_sec:
-          type:
-          - integer
-          - 'null'
-          description: Rate limit window duration in seconds.
-          example: 60
-  headers:
-    X-Request-Id:
-      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
-
-        to the `request_id` field in the response body. Quote it when contacting support.
-
-        '
-      schema:
-        type: string
-        format: uuid
-      example: 550e8400-e29b-41d4-a716-446655440000
-    X-RateLimit-Reset:
-      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
-
-        response whenever a rate limit is configured for the authenticated key.
-
-        '
-      schema:
-        type: integer
-      example: 1735689600
-    KnoxCall-Version:
-      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
-
-        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
-
-        '
-      schema:
-        type: string
-        pattern: ^\d{4}-\d{2}-\d{2}$
-      example: '2026-08-05'
-    X-RateLimit-Remaining:
-      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
-
-        limit is configured for the authenticated key.
-
-        '
-      schema:
-        type: integer
-      example: 999
-    Retry-After:
-      description: Seconds to wait before retrying. Set on `429` responses.
-      schema:
-        type: integer
-      example: 30
-    X-RateLimit-Limit:
-      description: 'Maximum requests allowed per window. Emitted on every response whenever a rate
-
-        limit is configured for the authenticated key.
-
-        '
-      schema:
-        type: integer
-      example: 1000
+        message:
+          type: string
+          description: Reminder to store the key securely.
+          example: Store this API key securely. It will not be shown again.
   responses:
-    RateLimited:
-      description: 'Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
-
-        also present on non-429 responses whenever a limit is configured.
-
-        '
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-        X-RateLimit-Limit:
-          $ref: '#/components/headers/X-RateLimit-Limit'
-        X-RateLimit-Remaining:
-          $ref: '#/components/headers/X-RateLimit-Remaining'
-        X-RateLimit-Reset:
-          $ref: '#/components/headers/X-RateLimit-Reset'
-        Retry-After:
-          $ref: '#/components/headers/Retry-After'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: rate_limit_exceeded
-              message: API rate limit exceeded. Please retry later.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    ValidationError:
-      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            validation_error:
-              summary: Request body failed validation
-              value:
-                error:
-                  type: validation_error
-                  message: name and target_base_url are required.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            invalid_idempotency_key:
-              summary: Malformed idempotency key
-              value:
-                error:
-                  type: invalid_idempotency_key
-                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
     Forbidden:
       description: 'The key is authenticated but not authorized for this action (missing scope), a plan
 
@@ -1058,7 +951,122 @@ components:
                   type: invalid_api_key
                   message: Invalid API key.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    RateLimited:
+      description: 'Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
+
+        also present on non-429 responses whenever a limit is configured.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: rate_limit_exceeded
+              message: API rate limit exceeded. Please retry later.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+  headers:
+    X-RateLimit-Remaining:
+      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 999
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+    Retry-After:
+      description: Seconds to wait before retrying. Set on `429` responses.
+      schema:
+        type: integer
+      example: 30
+    X-RateLimit-Reset:
+      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
+
+        response whenever a rate limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1735689600
+    X-RateLimit-Limit:
+      description: 'Maximum requests allowed per window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1000
   parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
     PerPageParam:
       name: per_page
       in: query
@@ -1068,14 +1076,6 @@ components:
         maximum: 100
         default: 20
       description: Number of items per page (max 100).
-    PageParam:
-      name: page
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        default: 1
-      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
   securitySchemes:
     OAuth2:
       type: oauth2

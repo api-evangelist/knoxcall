@@ -502,17 +502,40 @@ paths:
           $ref: '#/components/responses/InternalError'
 components:
   schemas:
-    RequestMeta:
+    CARole:
       type: object
-      description: Metadata included with every API response.
+      description: An issuing role — a named policy constraining what certificates can be issued under a root.
       properties:
-        request_id:
+        id:
           type: string
           format: uuid
-          description: Unique identifier for this API request, useful for support and debugging.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - request_id
+        ca_root_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: internal-tls
+        allowed_domains:
+          type: array
+          items:
+            type: string
+          example:
+          - svc.internal.example.com
+        allow_subdomains:
+          type: boolean
+        allow_wildcards:
+          type: boolean
+        max_ttl_seconds:
+          type: integer
+          example: 2592000
+        default_ttl_seconds:
+          type: integer
+          example: 86400
+        key_algorithm:
+          type: string
+          enum:
+          - ecdsa-p256
+          description: Leaf key algorithm. Currently always `ecdsa-p256`.
     CARoot:
       type: object
       description: A private certificate-authority root.
@@ -582,40 +605,17 @@ components:
         not_after:
           type: string
           format: date-time
-    CARole:
+    RequestMeta:
       type: object
-      description: An issuing role — a named policy constraining what certificates can be issued under a root.
+      description: Metadata included with every API response.
       properties:
-        id:
+        request_id:
           type: string
           format: uuid
-        ca_root_id:
-          type: string
-          format: uuid
-        name:
-          type: string
-          example: internal-tls
-        allowed_domains:
-          type: array
-          items:
-            type: string
-          example:
-          - svc.internal.example.com
-        allow_subdomains:
-          type: boolean
-        allow_wildcards:
-          type: boolean
-        max_ttl_seconds:
-          type: integer
-          example: 2592000
-        default_ttl_seconds:
-          type: integer
-          example: 86400
-        key_algorithm:
-          type: string
-          enum:
-          - ecdsa-p256
-          description: Leaf key algorithm. Currently always `ecdsa-p256`.
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
     ErrorResponse:
       type: object
       description: Standard error response envelope.
@@ -642,40 +642,9 @@ components:
           - request_id
       required:
       - error
-  parameters:
-    CARootName:
-      name: name
-      in: path
-      required: true
-      schema:
-        type: string
-        pattern: ^[a-zA-Z0-9_-]+$
-      description: The CA root name.
-      example: internal-services
-  headers:
-    X-Request-Id:
-      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
-
-        to the `request_id` field in the response body. Quote it when contacting support.
-
-        '
-      schema:
-        type: string
-        format: uuid
-      example: 550e8400-e29b-41d4-a716-446655440000
-    KnoxCall-Version:
-      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
-
-        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
-
-        '
-      schema:
-        type: string
-        pattern: ^\d{4}-\d{2}-\d{2}$
-      example: '2026-08-05'
   responses:
-    InternalError:
-      description: An unexpected server error occurred.
+    NotFound:
+      description: The requested resource was not found.
       headers:
         X-Request-Id:
           $ref: '#/components/headers/X-Request-Id'
@@ -687,9 +656,35 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              type: internal_error
-              message: An unexpected error occurred.
+              type: not_found
+              message: Route not found.
               request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
     Conflict:
       description: A resource with the same unique identifier already exists, or the resource is in use.
       headers:
@@ -706,8 +701,8 @@ components:
               type: conflict
               message: A route with this name already exists.
               request_id: 550e8400-e29b-41d4-a716-446655440000
-    NotFound:
-      description: The requested resource was not found.
+    InternalError:
+      description: An unexpected server error occurred.
       headers:
         X-Request-Id:
           $ref: '#/components/headers/X-Request-Id'
@@ -719,8 +714,8 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              type: not_found
-              message: Route not found.
+              type: internal_error
+              message: An unexpected error occurred.
               request_id: 550e8400-e29b-41d4-a716-446655440000
     Unauthorized:
       description: Authentication is required or the provided API key is invalid.
@@ -748,32 +743,37 @@ components:
                   type: invalid_api_key
                   message: Invalid API key.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
-    ValidationError:
-      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            validation_error:
-              summary: Request body failed validation
-              value:
-                error:
-                  type: validation_error
-                  message: name and target_base_url are required.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            invalid_idempotency_key:
-              summary: Malformed idempotency key
-              value:
-                error:
-                  type: invalid_idempotency_key
-                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  parameters:
+    CARootName:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9_-]+$
+      description: The CA root name.
+      example: internal-services
+  headers:
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
   securitySchemes:
     OAuth2:
       type: oauth2

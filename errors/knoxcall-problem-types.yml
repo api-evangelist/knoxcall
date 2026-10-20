@@ -1,8 +1,19 @@
-generated: '2026-10-18'
+generated: '2026-10-20'
 method: derived
 generator: derive-problem-types.py
 source:
-- openapi/knoxcall-openapi.json
+- openapi/knoxcall-account-api-openapi.yml
+- openapi/knoxcall-agents-api-openapi.yml
+- openapi/knoxcall-ai-gateway-api-openapi.yml
+- openapi/knoxcall-api-keys-api-openapi.yml
+- openapi/knoxcall-audit-logs-api-openapi.yml
+- openapi/knoxcall-client-tokens-api-openapi.yml
+- openapi/knoxcall-clients-api-openapi.yml
+- openapi/knoxcall-crypto-keys-api-openapi.yml
+- openapi/knoxcall-dynamic-db-credentials-api-openapi.yml
+- openapi/knoxcall-encryption-api-openapi.yml
+- openapi/knoxcall-environments-api-openapi.yml
+- openapi/knoxcall-ephemeral-proxy-api-openapi.yml
 format: custom
 envelope:
   media_type: application/json

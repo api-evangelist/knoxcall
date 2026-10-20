@@ -1,4 +1,4 @@
-generated: '2026-10-18'
+generated: '2026-10-20'
 method: probed
 source: pre-flight dossier (docs platform, portal detections) + CNAME chains and response headers of the hosts apis.yml names
 registry: all/0-working/vendors.yml
@@ -35,19 +35,6 @@ vendors:
   kin_score:
   - https_enforced
   - hsts
-- vendor: mintlify
-  name: Mintlify
-  area: documentation
-  host: docs.knoxcall.com
-  evidence: markup:mintlify
-  signal: docs-platform
-  confidence: medium
-  kin_score:
-  - openapi_published
-  - llms_txt
-  - mcp_server
-  - markdown_negotiation
-  - x_mint_pointer
 - vendor: vercel
   name: Vercel
   area: hosting
@@ -60,15 +47,14 @@ reliance:
   areas_vendor_served:
   - api-collections
   - cdn
-  - documentation
   - hosting
-  vendor_count: 4
+  vendor_count: 3
   areas_observed: 12
-  share_of_observable_areas: 0.333
+  share_of_observable_areas: 0.25
   note: areas where a third party was DETECTED serving this provider; an area absent here was either self-run or not observed, and this script
     cannot tell those apart
 checked:
-- 'docs-platform: mintlify'
+- 'docs-platform: not probed'
 - knoxcall.com (Website)
 - docs.knoxcall.com (DeveloperPortal)
 - docs.knoxcall.com (Documentation)

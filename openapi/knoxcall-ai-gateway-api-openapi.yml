@@ -2466,32 +2466,190 @@ paths:
           $ref: '#/components/responses/AiGatewayDataPlaneError'
 components:
   schemas:
-    MintAiGatewayTokenRequest:
+    UpdateAiGatewayRequest:
       type: object
+      description: Only the provided fields are changed.
       properties:
         name:
           type: string
-          description: A human-readable label for the token.
+        description:
+          type:
+          - string
+          - 'null'
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+        budget_overage_action:
+          type: string
+          enum:
+          - block
+          - warn
+          description: 'What happens when the gateway''s cap is spent (AIGW-150). Defaults to `block`. No `fallback` — that action swaps an agent''s route and model, which a gateway does not have.
+
+            '
+        geo_velocity_action:
+          type: string
+          enum:
+          - 'off'
+          - warn
+          - block
+        model_aliases:
+          type: object
+          description: 'Model aliases shared by every agent under this gateway (AIGW-42): `{alias: real_model_id}`. Name `fast` once here rather than in every call site of every service.
+
+
+            Resolved BEFORE the per-agent model policy, so an alias target is still subject to that agent''s allow/deny list and `model_rewrite` — an alias is a naming convenience, never a way around a control. A chain resolves with a hop limit; a cycle degrades to the original model rather than looping. Max 100 entries.
+
+            '
+          additionalProperties:
+            type: string
+            maxLength: 200
+    AiGatewayFirewallPolicy:
+      type: object
+      description: A tenant-scoped prompt-firewall policy, attachable to agents and MCP servers.
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        version:
+          type: integer
+          description: Bumped when a policy is re-created under the same name.
+        heuristics:
+          type: array
+          description: Tenant rules. The built-in prompt-injection patterns always run in addition to these.
+          items:
+            $ref: '#/components/schemas/AiGatewayFirewallRule'
+        canary_enabled:
+          type:
+          - boolean
+          - 'null'
+          description: Inject a canary token into the system prompt and flag it if the model echoes it back.
+        action:
+          type: string
+          enum:
+          - block
+          - warn
+          - tag
+        created_at:
+          type: string
+          format: date-time
+    AiGatewayUsage:
+      type: object
+      description: Cost and token rollup by model over the requested period.
+      properties:
+        period_days:
+          type: integer
+        by_model:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiGatewayUsageByModel'
+        totals:
+          $ref: '#/components/schemas/AiGatewayUsageTotals'
+      required:
+      - period_days
+      - by_model
+      - totals
+    RequestMeta:
+      type: object
+      description: Metadata included with every API response.
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    AiGatewayPiiRecognizerUpdate:
+      type: object
+      description: 'Partial. The server validates the MERGED state, not the patch — `pattern`, `kind` and
+
+        `action` together decide whether a pattern is compiled and how the detector is ranked.
+
+        '
+      properties:
+        name:
+          type: string
         kind:
           type: string
           enum:
-          - agent
-          - read
-          - tool
-          - oneshot
-          default: agent
-        dpop_required:
-          type: boolean
-          default: false
-          description: Bind the token to a DPoP key. Requires `dpop_jkt`.
-        dpop_jkt:
+          - regex
+          - aho_corasick
+          - presidio_pattern
+          - presidio_ner
+          - presidio_custom
+        pattern:
           type: string
-          description: base64url SHA-256 thumbprint of your DPoP public key. Required when `dpop_required` is true.
-        expires_in_seconds:
+        context_words:
+          type: array
+          items:
+            type: string
+        confidence:
+          type: number
+          format: float
+        action:
+          type: string
+          enum:
+          - redact
+          - tokenize
+          - whitelist
+          - warn
+        format:
+          type:
+          - string
+          - 'null'
+        enabled:
+          type: boolean
+    AiGatewayTokenExchangeResponse:
+      type: object
+      description: 'RFC 8693 §2.2.1 response. This is a bare OAuth body, NOT the `{data, meta}` envelope
+
+        the rest of `/v1` returns — an OAuth client parses this shape.
+
+        '
+      required:
+      - access_token
+      - issued_token_type
+      - token_type
+      - expires_in
+      properties:
+        access_token:
+          type: string
+          description: 'The capability token, returned ONCE. Send it as `Authorization: Bearer <token>`
+
+            to `/v1/ai` (agent kind) or `/v1/mcp/<slug>` (tool kind, resource-bound).
+
+            '
+          example: kp_live_a_8f3c1d2e5a7b9c0d1e2f3a4b5c6d7e8f_A1B2C3D4
+        issued_token_type:
+          type: string
+          enum:
+          - urn:ietf:params:oauth:token-type:access_token
+        token_type:
+          type: string
+          enum:
+          - Bearer
+        expires_in:
           type: integer
-          minimum: 60
-          maximum: 7776000
-          description: Token lifetime, clamped to [60s, 90d]. Omit for the 30 days default; a non-expiring token cannot be minted.
+          description: Lifetime in seconds, from the binding's `access_token_ttl_seconds` (default 900).
+          example: 900
+        scope:
+          type: string
+          description: 'The capability scope, JSON-encoded, for visibility only. The source of truth is
+
+            the capability HMAC bound into the token — editing this string changes nothing.
+
+            '
     CreateAiGatewayMcpServerRequest:
       type: object
       required:
@@ -2572,39 +2730,42 @@ components:
           enum:
           - fail_open
           - fail_closed
-    AiGatewayPhantomToken:
+    AiGatewayMcpGrant:
       type: object
-      description: A capability (phantom) token row. The plaintext is never returned here — only at mint time.
+      description: 'One person''s delegated-OAuth connection to an MCP server (AIGW-190).
+
+        Never carries the stored tokens.
+
+        '
       properties:
         id:
           type: string
           format: uuid
-        name:
+        attributed_user_id:
+          type: string
+          format: uuid
+          description: The tenant directory row this connection belongs to.
+        external_id:
+          type: string
+          description: That person's identifier in your directory.
+        display_name:
           type:
           - string
           - 'null'
-        kind:
+        scopes:
+          type: array
+          items:
+            type: string
+          description: The scopes the upstream actually granted.
+        status:
           type: string
           enum:
-          - agent
-          - read
-          - tool
-          - oneshot
-        prefix:
+          - active
+          - revoked
+        created_at:
           type: string
-          description: The non-secret token prefix, safe to display.
-        dpop_required:
-          type: boolean
-        scope_jsonb:
-          type: object
-          additionalProperties: true
-          description: The capability scope (providers/models) the token is bound to.
-        expires_at:
-          type:
-          - string
-          - 'null'
           format: date-time
-        revoked_at:
+        last_refreshed_at:
           type:
           - string
           - 'null'
@@ -2614,352 +2775,48 @@ components:
           - string
           - 'null'
           format: date-time
-        created_at:
-          type: string
-          format: date-time
-      required:
-      - id
-      - kind
-      - prefix
-      - dpop_required
-      - created_at
-    AiGatewayPiiRecognizer:
-      type: object
-      description: One tenant-defined PII detector.
-      properties:
-        id:
-          type: string
-          format: uuid
-        tenant_id:
-          type: string
-          format: uuid
-        name:
-          type: string
-        kind:
-          type: string
-          enum:
-          - regex
-          - aho_corasick
-          - presidio_pattern
-          - presidio_ner
-          - presidio_custom
-          description: '`regex` and `aho_corasick` run in-process; the three `presidio_*` kinds are handed
+        has_refresh_token:
+          type: boolean
+          description: 'Whether KnoxCall holds a renewable credential for this person. False
 
-            to a Presidio sidecar.
+            means the connection cannot outlive its current access token and the
+
+            person should reconnect.
 
             '
-        pattern:
+    AiGatewayPiiPolicyCreate:
+      type: object
+      required:
+      - name
+      properties:
+        name:
           type: string
-        context_words:
+          description: 2-64 chars (letters, digits, space, underscore, hyphen). Unique per tenant.
+          example: HIPAA
+        recognizer_ids:
           type: array
-          description: Words that must appear nearby for a match to count.
+          description: Must all be recognizers this tenant owns; a foreign id is a 400 `recognizer_not_found`.
           items:
             type: string
-        confidence:
-          type: number
-          format: float
-        action:
+            format: uuid
+        default_action:
           type: string
           enum:
           - redact
           - tokenize
           - whitelist
           - warn
-        format:
-          type:
-          - string
-          - 'null'
-          description: Token format for `tokenize`; null otherwise.
-        enabled:
-          type: boolean
-          description: False mutes the recognizer without losing its definition.
-        created_at:
-          type: string
-          format: date-time
-    UpdateAiGatewayRequest:
-      type: object
-      description: Only the provided fields are changed.
-      properties:
-        name:
-          type: string
+          default: redact
         description:
-          type:
-          - string
-          - 'null'
-        budget_daily_usd:
-          type:
-          - number
-          - 'null'
-        budget_monthly_usd:
-          type:
-          - number
-          - 'null'
-        budget_overage_action:
           type: string
-          enum:
-          - block
-          - warn
-          description: 'What happens when the gateway''s cap is spent (AIGW-150). Defaults to `block`. No `fallback` — that action swaps an agent''s route and model, which a gateway does not have.
-
-            '
-        geo_velocity_action:
-          type: string
-          enum:
-          - 'off'
-          - warn
-          - block
-        model_aliases:
-          type: object
-          description: 'Model aliases shared by every agent under this gateway (AIGW-42): `{alias: real_model_id}`. Name `fast` once here rather than in every call site of every service.
-
-
-            Resolved BEFORE the per-agent model policy, so an alias target is still subject to that agent''s allow/deny list and `model_rewrite` — an alias is a naming convenience, never a way around a control. A chain resolves with a hop limit; a cycle degrades to the original model rather than looping. Max 100 entries.
-
-            '
-          additionalProperties:
-            type: string
-            maxLength: 200
-    AiGatewayRoutingPolicy:
+          maxLength: 1000
+    UpsertAiGatewayMcpToolRequest:
       type: object
-      description: 'How this agent retries and spreads load (AIGW-42). An empty object — the default for every agent — means one attempt per route and fail-over to `fallback_route_ids` on 5xx only, which is the behaviour the gateway has always had.
-
-
-        Every field is clamped server-side. A request parked waiting to retry occupies an API worker, so `max_attempts` caps at 5, any single delay at 30s, a honoured `Retry-After` at 60s, and the total sleep for one request at 60s regardless of how the fields combine.
-
-        '
-      additionalProperties: false
-      properties:
-        retry_on:
-          type: array
-          description: 'Which outcomes are retried on the SAME route before failing over. `429` also promotes a rate-limit response to a fail-over trigger; without it a 429 is returned to you immediately, unchanged.
-
-            '
-          items:
-            type: string
-            enum:
-            - '429'
-            - 5xx
-            - timeout
-        max_attempts:
-          type: integer
-          minimum: 1
-          maximum: 5
-          description: 'Attempts per candidate route, including the first. Forced to 1 when `retry_on` is empty, so a stored policy never claims a retry that cannot happen.
-
-            '
-        backoff_ms:
-          type: integer
-          minimum: 0
-          maximum: 30000
-          description: Delay before the second attempt.
-        backoff_multiplier:
-          type: number
-          minimum: 1
-          maximum: 10
-        max_backoff_ms:
-          type: integer
-          minimum: 0
-          maximum: 30000
-        respect_retry_after:
-          type: boolean
-          description: 'Default true. An upstream `Retry-After` is honoured when it asks for LONGER than the computed backoff — it can extend a wait, never shorten one.
-
-            '
-        max_retry_after_ms:
-          type: integer
-          minimum: 0
-          maximum: 60000
-          description: Ceiling on a honoured `Retry-After`.
-        jitter:
-          type: boolean
-          description: 'Default true. Spreads each delay across 50–100% of its computed value so a fleet does not retry in lockstep.
-
-            '
-        route_weights:
-          type: object
-          description: '`{route_id: weight}`. When present, the route that serves a request is chosen in proportion to its weight across the primary and every fallback, and the remainder stay in weighted order for fail-over. A route not named here keeps weight 1; a route weighted 0 is drained and receives no traffic at all, including fail-over traffic. The token''s own capability scope is enforced on every candidate, so a weight can never reach a route the token was not granted.
-
-            '
-          additionalProperties:
-            type: integer
-            minimum: 0
-            maximum: 1000
-    AiGatewayPhantomTokenCreated:
-      type: object
-      description: The mint result. `token` is the plaintext capability token and is shown exactly once.
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type:
-          - string
-          - 'null'
-        kind:
-          type: string
-          enum:
-          - agent
-          - read
-          - tool
-          - oneshot
-        prefix:
-          type: string
-        token:
-          type: string
-          description: The plaintext capability token — store it now; it is never shown again.
-        dpop_required:
-          type: boolean
-        expires_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
       required:
-      - id
-      - kind
-      - prefix
-      - token
-    AiGatewayUsageExportRow:
-      type: object
+      - tool_name
       properties:
-        group:
-          type:
-          - string
-          - 'null'
-          description: The dimension value for this row (e.g. a model id, provider name, or tag value).
-        requests:
-          type: integer
-        input_tokens:
-          type: integer
-        output_tokens:
-          type: integer
-        cost_usd:
-          type: number
-        unpriced_requests:
-          type: integer
-    AiGatewayUsageByModel:
-      type: object
-      properties:
-        provider:
-          type: string
-        model:
-          type: string
-        requests:
-          type: integer
-        input_tokens:
-          type: integer
-        output_tokens:
-          type: integer
-        cost_usd:
-          type: number
-        unpriced_requests:
-          type: integer
-          description: Requests with no price data (excluded from cost).
-    AiGatewayFirewallTestResult:
-      type: object
-      properties:
-        matched:
-          type: boolean
-        matches:
-          type: array
-          items:
-            type: object
-            properties:
-              rule:
-                type: string
-              span:
-                type: array
-                items:
-                  type: integer
-                minItems: 2
-                maxItems: 2
-              matched:
-                type: string
-        skipped:
-          type: array
-          description: Rules that could not be compiled and so did not run. Always empty for a validated request.
-          items:
-            type: object
-            properties:
-              rule:
-                type: string
-              reason:
-                type: string
-    AiGatewayTokenExchangeRequest:
-      type: object
-      description: 'RFC 8693 token-exchange request for `POST /v1/oauth/token`. Sent as
-
-        `application/x-www-form-urlencoded` (RFC 6749) or `application/json`.
-
-        '
-      required:
-      - grant_type
-      - subject_token
-      - subject_token_type
-      properties:
-        grant_type:
-          type: string
-          enum:
-          - urn:ietf:params:oauth:grant-type:token-exchange
-          description: Only token-exchange. Anything else is `unsupported_grant_type`.
-        subject_token:
-          type: string
-          description: 'The workload''s OIDC id_token, JWS-compact. Its `iss` must match a registered
-
-            binding, its signature must verify against that issuer''s published JWKS, and it
-
-            must be unexpired. Where single-use enforcement is on, a second exchange of the
-
-            same token is `invalid_grant`.
-
-            '
-        subject_token_type:
-          type: string
-          enum:
-          - urn:ietf:params:oauth:token-type:id_token
-          description: Only `id_token`. Anything else is `invalid_request`.
-        audience:
-          type: string
-          default: knoxcall:gateway
-          description: Defaults to `knoxcall:gateway`. Any other value is `invalid_target`.
-        resource:
-          type: string
-          format: uri
-          description: 'RFC 8707 resource indicator — the `resource` value from an MCP server''s
-
-            create/get response. Supplying it narrows the minted token to `tool` kind and
-
-            binds that resource into the capability HMAC, so the token reaches exactly that
-
-            one MCP server and nothing else. Omit it for an `agent`-kind token for the
-
-            `/v1/ai` plane. A repeated or non-string value is `invalid_target` — it is never
-
-            silently dropped, because dropping it would mint an UNCONFINED token while the
-
-            client believes it is audience-restricted.
-
-            '
-    AiGatewayMcpTool:
-      type: object
-      description: A tool metadata row. It does not widen what the server advertises — that is the intersection of `allowed_tools`, the upstream's real tools and the token's tool scope.
-      properties:
-        id:
-          type: string
-          format: uuid
-        tenant_id:
-          type: string
-          format: uuid
-        mcp_server_id:
-          type: string
-          format: uuid
         tool_name:
           type: string
-        route_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
         description:
           type:
           - string
@@ -2969,229 +2826,33 @@ components:
           additionalProperties: true
         enabled:
           type: boolean
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    AiGatewayMcpAuth:
+          default: true
+    MintAiGatewayTokenRequest:
       type: object
-      description: 'Upstream auth for an MCP server. A secret reference is the only supported path: every header value must contain a `{{secret_id:<uuid>}}` (or legacy `{{secret:<name>}}`) placeholder. A literal is refused with 422 `plaintext_auth` — it would sit in cleartext in the control plane.'
-      properties:
-        headers:
-          type: object
-          additionalProperties:
-            type: string
-          example:
-            Authorization: Bearer {{secret_id:11111111-2222-3333-4444-555555555555}}
-        environment_name:
-          type: string
-          default: production
-          description: Which per-environment secret value to resolve.
-      additionalProperties: false
-    UpdateAiGatewayAgentRequest:
-      type: object
-      description: Only the provided fields are changed. Every writable column on an agent appears here — this schema is what the typed SDKs are generated and reviewed against, so a field missing from it becomes a field missing from them (AIGW-161).
       properties:
         name:
           type: string
-        slug:
-          type: string
-          description: 'RENAMES the agent, which MOVES its data-plane URL: `agent_url` is computed from the slug rather than stored, so every caller pointed at the old URL gets a 404 from the moment this returns. The new URL is on this response — read it rather than reconstructing it.'
-        description:
-          type:
-          - string
-          - 'null'
-        primary_route_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        fallback_route_ids:
-          type: array
-          items:
-            type: string
-            format: uuid
-        default_model:
-          type:
-          - string
-          - 'null'
-        model_allowlist:
-          type: array
-          items:
-            type: string
-        model_denylist:
-          type: array
-          items:
-            type: string
-        model_rewrite:
-          type: object
-          additionalProperties:
-            type: string
-          maxProperties: 100
-          description: Map of requested model → substituted model. Values must be STRINGS (the server validates with a string map) and at most 100 entries.
-        budget_daily_usd:
-          type:
-          - number
-          - 'null'
-        budget_monthly_usd:
-          type:
-          - number
-          - 'null'
-        budget_per_call_max_tokens:
-          type:
-          - integer
-          - 'null'
-        budget_overage_action:
+          description: A human-readable label for the token.
+        kind:
           type: string
           enum:
-          - block
-          - warn
-          - fallback
-          description: What happens once a budget is exhausted. `fallback` needs `fallback_agent_id`; without one it behaves as `block`.
-        fallback_agent_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        streaming_enabled:
+          - agent
+          - read
+          - tool
+          - oneshot
+          default: agent
+        dpop_required:
           type: boolean
-        firewall_policy_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        pii_redact_policy_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        pii_detokenize_response:
-          type: boolean
-          deprecated: true
-          description: AIGW-100 legacy alias for `pii_response_mode` (`true` -> `detokenize`, `false` -> `redact`). Still accepted; sending both with contradictory values is a 400.
-        pii_request_mode:
+          default: false
+          description: Bind the token to a DPoP key. Requires `dpop_jkt`.
+        dpop_jkt:
           type: string
-          enum:
-          - 'off'
-          - tokenize
-          description: What happens to the PROMPT before it leaves KnoxCall. Default `tokenize`. Set `off` only for an agent whose payload must reach the provider byte-for-byte (structured tool-use JSON, for example) — it means prompts are forwarded unscanned.
-        pii_response_mode:
-          type: string
-          enum:
-          - redact
-          - detokenize
-          description: What happens to the provider's answer. Default `detokenize`.
-        pii_streaming_holdback_chars:
+          description: base64url SHA-256 thumbprint of your DPoP public key. Required when `dpop_required` is true.
+        expires_in_seconds:
           type: integer
-          description: How many characters of a STREAMED answer are held back while a detector decides. Larger catches an entity split across more chunks; smaller is lower latency.
-        pii_streaming_mode:
-          type: string
-          enum:
-          - holdback
-          - buffer
-          - monitor
-          description: How a streamed answer is rewritten. `holdback` releases text behind a sliding window; `buffer` withholds the whole answer until it is complete; `monitor` REPORTS detections without rewriting, so the raw value reaches the client — an observability mode, not a redaction one.
-        tags:
-          type: object
-          additionalProperties: true
-          description: FinOps attribution labels (cost_center/team/project/…) echoed onto this agent's usage rows.
-        cache_mode:
-          type: string
-          enum:
-          - 'off'
-          - exact
-          - semantic
-          description: '`semantic` additionally needs `cache_embedding_model`; without one the cache reports itself degraded and serves nothing.'
-        cache_ttl_seconds:
-          type: integer
-        cache_similarity_threshold:
-          type: number
-          minimum: 0
-          maximum: 1
-          description: 'Cosine floor for a semantic cache hit, 0–1. Lower means more hits, and more wrong ones. NOT nullable: the column is `NOT NULL` and the validator is non-nullable, so an explicit `null` is a 400.'
-        cache_embedding_model:
-          type:
-          - string
-          - 'null'
-        tool_allowlist:
-          type: array
-          items:
-            type: string
-        output_schema:
-          type:
-          - object
-          - 'null'
-          additionalProperties: true
-          description: JSON Schema the answer is validated against.
-        output_validation_action:
-          type: string
-          enum:
-          - block
-          - retry
-          - warn
-        data_residency_region:
-          type:
-          - string
-          - 'null'
-        cmek_key_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        routing_policy:
-          $ref: '#/components/schemas/AiGatewayRoutingPolicy'
-        guardrail_webhook_url:
-          type:
-          - string
-          - 'null'
-          format: uri
-          description: 'HTTPS endpoint your own scanner listens on (AIGW-45). Every prompt — and, in `response`/`both` mode, every response — is POSTed to it for a verdict before it moves.
-
-
-            What it receives is the REDACTED, post-tokenization body: the same bytes the provider would get, never a resolved provider credential and never your KnoxCall token. Shipping raw PHI to a third party to ask whether it contains PHI would be the leak the gateway exists to prevent.
-
-
-            The destination is resolved and refused at write time AND on every call — a private, loopback, link-local or cloud-metadata address is a 400, because DNS is not a promise.
-
-            '
-        guardrail_webhook_secret_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
-          description: 'Secret holding the HMAC-SHA256 key deliveries are signed with. The signature covers `<timestamp>.<body>` and travels in `x-knox-guardrail-signature` with the timestamp in `x-knox-guardrail-timestamp`, so a captured delivery is not replayable. Omit to send unsigned — the receiver then cannot prove the call came from KnoxCall.
-
-            '
-        guardrail_webhook_mode:
-          type: string
-          enum:
-          - 'off'
-          - request
-          - response
-          - both
-          description: 'Which directions are inspected. `response` and `both` evaluate the complete buffered response before it is sent, so an agent in those modes REFUSES a streaming request (400 `guardrail_streaming_unsupported`) rather than serving one past a control that could not run on it.
-
-            '
-        guardrail_webhook_timeout_ms:
-          type: integer
-          minimum: 100
-          maximum: 10000
-          description: 'How long to wait for a verdict. Clamped, because a request waiting on your scanner is holding one of the gateway''s API workers.
-
-            '
-        guardrail_webhook_failure_action:
-          type: string
-          enum:
-          - fail_open
-          - fail_closed
-          description: 'What happens when the hook does not answer. Applies identically to EVERY non-answer — timeout, refused connection, refused destination, non-2xx, unparseable body, an `action` verb we do not recognise. Defaults to `fail_open`, which is the posture an agent already has with no hook at all.
-
-
-            A hook responds `200` with `{"action":"allow"|"block"|"flag","reason":"…"}`. `block` refuses the request with 400 `guardrail_block` and your `reason` in the message; `flag` serves it and records the outcome.
-
-            '
+          minimum: 60
+          maximum: 7776000
+          description: Token lifetime, clamped to [60s, 90d]. Omit for the 30 days default; a non-expiring token cannot be minted.
     AiGatewayFirewallRule:
       type: object
       description: One heuristic rule inside a firewall policy.
@@ -3346,76 +3007,90 @@ components:
           type: string
           format: uri
           description: The RFC 8707 `resource` a token for this server must be bound to. A token bound to a different resource is refused at this server.
-    AiGatewayUsage:
+    PaginationMeta:
       type: object
-      description: Cost and token rollup by model over the requested period.
+      description: Pagination metadata for list endpoints.
       properties:
-        period_days:
+        total:
           type: integer
-        by_model:
-          type: array
-          items:
-            $ref: '#/components/schemas/AiGatewayUsageByModel'
-        totals:
-          $ref: '#/components/schemas/AiGatewayUsageTotals'
+          description: Total number of records matching the query.
+          example: 42
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        per_page:
+          type: integer
+          description: Number of records per page.
+          example: 20
+        total_pages:
+          type: integer
+          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
+          example: 3
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request.
+          example: 550e8400-e29b-41d4-a716-446655440000
       required:
-      - period_days
-      - by_model
-      - totals
-    AiGatewayDataPlaneError:
+      - total
+      - page
+      - per_page
+      - total_pages
+      - request_id
+    AiGatewayPhantomTokenCreated:
       type: object
-      description: 'AIGW-163 — the ONE error envelope of the AI data plane, served by `/v1/ai/*` and by
-
-        every layer in front of it (authentication, the audience guard, the rate limiter,
-
-        the boot sentinel).
-
-
-        It is NOT the `{error: {type, message, request_id}}` envelope the rest of `/v1`
-
-        uses. That one belongs to the Management API, which is a different plane with a
-
-        different credential; this one is what a governed proxy can answer beside a
-
-        provider''s own body. `/v1/mcp` answers JSON-RPC 2.0 and `/v1/oauth/token` answers
-
-        RFC 6749 §5.2, both by their protocols'' rules.
-
-
-        **`error` and `code` always carry the same value.** That is deliberate: three
-
-        incompatible shapes existed here before AIGW-163 and they disagreed about which of
-
-        the two was machine-readable, so both are now, and a client that reads either keeps
-
-        working. Branch on the identifier, never on `error_description` — descriptions are
-
-        rewritten whenever a clearer wording is found.
-
-
-        Some refusals add extra keys alongside the three (`utilization_pct`, `model`,
-
-        `request_id`). Ignore keys you do not recognise; new ones are additive.
-
-        '
-      required:
-      - error
-      - error_description
-      - code
-      additionalProperties: true
+      description: The mint result. `token` is the plaintext capability token and is shown exactly once.
       properties:
-        error:
+        id:
           type: string
-          description: Machine-readable identifier. Identical to `code`.
-          example: budget_exceeded
-        error_description:
+          format: uuid
+        name:
+          type:
+          - string
+          - 'null'
+        kind:
           type: string
-          description: Human-readable sentence. Never parse it.
-          example: 'Daily budget exceeded: $50.0031 ≥ $50'
-        code:
+          enum:
+          - agent
+          - read
+          - tool
+          - oneshot
+        prefix:
           type: string
-          description: Machine-readable identifier. Identical to `error`.
-          example: budget_exceeded
+        token:
+          type: string
+          description: The plaintext capability token — store it now; it is never shown again.
+        dpop_required:
+          type: boolean
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      required:
+      - id
+      - kind
+      - prefix
+      - token
+    AiGatewayUsageExportRow:
+      type: object
+      properties:
+        group:
+          type:
+          - string
+          - 'null'
+          description: The dimension value for this row (e.g. a model id, provider name, or tag value).
+        requests:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        cost_usd:
+          type: number
+        unpriced_requests:
+          type: integer
     ErrorResponse:
       type: object
       description: Standard error response envelope.
@@ -3442,57 +3117,31 @@ components:
           - request_id
       required:
       - error
-    AiGatewayPiiRecognizerTestResult:
+    AiGatewayMcpAuth:
       type: object
+      description: 'Upstream auth for an MCP server. A secret reference is the only supported path: every header value must contain a `{{secret_id:<uuid>}}` (or legacy `{{secret:<name>}}`) placeholder. A literal is refused with 422 `plaintext_auth` — it would sit in cleartext in the control plane.'
       properties:
-        matched:
-          type: boolean
-        matches:
-          type: array
-          items:
-            type: object
-            properties:
-              span:
-                type: array
-                items:
-                  type: integer
-                minItems: 2
-                maxItems: 2
-              matched:
-                type: string
-                description: The exact substring the pattern matched.
-              replacement:
-                type: string
-                description: What the data plane would substitute for it.
-              entity_type:
-                type: string
-    AiGatewayUsageExport:
-      type: object
-      description: FinOps showback/chargeback rollup, aggregated by the requested dimension.
-      properties:
-        group_by:
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            Authorization: Bearer {{secret_id:11111111-2222-3333-4444-555555555555}}
+        environment_name:
           type: string
-          description: 'The grouping dimension: `user`, `team`, `agent`, `model`, `provider`, or `tag:<key>`.'
-        period_days:
-          type: integer
-        rows:
-          type: array
-          items:
-            $ref: '#/components/schemas/AiGatewayUsageExportRow'
-      required:
-      - group_by
-      - period_days
-      - rows
-    AiGatewayPiiRecognizerUpdate:
+          default: production
+          description: Which per-environment secret value to resolve.
+      additionalProperties: false
+    AiGatewayPiiRecognizerCreate:
       type: object
-      description: 'Partial. The server validates the MERGED state, not the patch — `pattern`, `kind` and
-
-        `action` together decide whether a pattern is compiled and how the detector is ranked.
-
-        '
+      required:
+      - name
+      - kind
+      - pattern
       properties:
         name:
           type: string
+          example: employee_id
         kind:
           type: string
           enum:
@@ -3503,6 +3152,8 @@ components:
           - presidio_custom
         pattern:
           type: string
+          maxLength: 4096
+          example: EMP-[0-9]{6}
         context_words:
           type: array
           items:
@@ -3510,6 +3161,9 @@ components:
         confidence:
           type: number
           format: float
+          minimum: 0
+          maximum: 1
+          default: 0.85
         action:
           type: string
           enum:
@@ -3517,12 +3171,69 @@ components:
           - tokenize
           - whitelist
           - warn
+          default: redact
         format:
           type:
           - string
           - 'null'
         enabled:
           type: boolean
+          default: true
+    AiGatewayTokenExchangeRequest:
+      type: object
+      description: 'RFC 8693 token-exchange request for `POST /v1/oauth/token`. Sent as
+
+        `application/x-www-form-urlencoded` (RFC 6749) or `application/json`.
+
+        '
+      required:
+      - grant_type
+      - subject_token
+      - subject_token_type
+      properties:
+        grant_type:
+          type: string
+          enum:
+          - urn:ietf:params:oauth:grant-type:token-exchange
+          description: Only token-exchange. Anything else is `unsupported_grant_type`.
+        subject_token:
+          type: string
+          description: 'The workload''s OIDC id_token, JWS-compact. Its `iss` must match a registered
+
+            binding, its signature must verify against that issuer''s published JWKS, and it
+
+            must be unexpired. Where single-use enforcement is on, a second exchange of the
+
+            same token is `invalid_grant`.
+
+            '
+        subject_token_type:
+          type: string
+          enum:
+          - urn:ietf:params:oauth:token-type:id_token
+          description: Only `id_token`. Anything else is `invalid_request`.
+        audience:
+          type: string
+          default: knoxcall:gateway
+          description: Defaults to `knoxcall:gateway`. Any other value is `invalid_target`.
+        resource:
+          type: string
+          format: uri
+          description: 'RFC 8707 resource indicator — the `resource` value from an MCP server''s
+
+            create/get response. Supplying it narrows the minted token to `tool` kind and
+
+            binds that resource into the capability HMAC, so the token reaches exactly that
+
+            one MCP server and nothing else. Omit it for an `agent`-kind token for the
+
+            `/v1/ai` plane. A repeated or non-string value is `invalid_target` — it is never
+
+            silently dropped, because dropping it would mint an UNCONFINED token while the
+
+            client believes it is audience-restricted.
+
+            '
     AiGatewayAgent:
       type: object
       description: An agent under a gateway — the addressable unit an AI SDK points at.
@@ -3770,212 +3481,6 @@ components:
       - agent_url
       - created_at
       - updated_at
-    AiGatewayUsageTotals:
-      type: object
-      properties:
-        requests:
-          type: integer
-        input_tokens:
-          type: integer
-        output_tokens:
-          type: integer
-        cost_usd:
-          type: number
-        unpriced_requests:
-          type: integer
-    AiGatewayMcpGrant:
-      type: object
-      description: 'One person''s delegated-OAuth connection to an MCP server (AIGW-190).
-
-        Never carries the stored tokens.
-
-        '
-      properties:
-        id:
-          type: string
-          format: uuid
-        attributed_user_id:
-          type: string
-          format: uuid
-          description: The tenant directory row this connection belongs to.
-        external_id:
-          type: string
-          description: That person's identifier in your directory.
-        display_name:
-          type:
-          - string
-          - 'null'
-        scopes:
-          type: array
-          items:
-            type: string
-          description: The scopes the upstream actually granted.
-        status:
-          type: string
-          enum:
-          - active
-          - revoked
-        created_at:
-          type: string
-          format: date-time
-        last_refreshed_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        last_used_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        has_refresh_token:
-          type: boolean
-          description: 'Whether KnoxCall holds a renewable credential for this person. False
-
-            means the connection cannot outlive its current access token and the
-
-            person should reconnect.
-
-            '
-    CreateAiGatewayRequest:
-      type: object
-      required:
-      - name
-      - slug
-      properties:
-        name:
-          type: string
-        slug:
-          type: string
-          description: Unique machine handle within the tenant.
-        description:
-          type:
-          - string
-          - 'null'
-        budget_daily_usd:
-          type:
-          - number
-          - 'null'
-        budget_monthly_usd:
-          type:
-          - number
-          - 'null'
-        budget_overage_action:
-          type: string
-          enum:
-          - block
-          - warn
-          description: 'What happens when the gateway''s cap is spent (AIGW-150). Defaults to `block`. No `fallback` — that action swaps an agent''s route and model, which a gateway does not have.
-
-            '
-    OAuthError:
-      type: object
-      description: OAuth 2.1 error response (RFC 6749 §5.2). The OAuth endpoints use this shape rather than the /v1 `ErrorResponse` envelope.
-      required:
-      - error
-      properties:
-        error:
-          type: string
-          enum:
-          - invalid_request
-          - invalid_client
-          - invalid_grant
-          - unauthorized_client
-          - unsupported_grant_type
-          - invalid_scope
-          - access_denied
-          - authorization_pending
-          - slow_down
-          - expired_token
-          - invalid_target
-          - server_error
-          description: A single ASCII error code from RFC 6749 §5.2 / RFC 8628 §3.5 / RFC 8693 §2.2.2.
-          example: invalid_grant
-        error_description:
-          type: string
-          description: Human-readable explanation of the error.
-        error_uri:
-          type: string
-          format: uri
-          description: URI of a human-readable web page with error information.
-    AiGatewayPiiRecognizerCreate:
-      type: object
-      required:
-      - name
-      - kind
-      - pattern
-      properties:
-        name:
-          type: string
-          example: employee_id
-        kind:
-          type: string
-          enum:
-          - regex
-          - aho_corasick
-          - presidio_pattern
-          - presidio_ner
-          - presidio_custom
-        pattern:
-          type: string
-          maxLength: 4096
-          example: EMP-[0-9]{6}
-        context_words:
-          type: array
-          items:
-            type: string
-        confidence:
-          type: number
-          format: float
-          minimum: 0
-          maximum: 1
-          default: 0.85
-        action:
-          type: string
-          enum:
-          - redact
-          - tokenize
-          - whitelist
-          - warn
-          default: redact
-        format:
-          type:
-          - string
-          - 'null'
-        enabled:
-          type: boolean
-          default: true
-    PaginationMeta:
-      type: object
-      description: Pagination metadata for list endpoints.
-      properties:
-        total:
-          type: integer
-          description: Total number of records matching the query.
-          example: 42
-        page:
-          type: integer
-          description: Current page number.
-          example: 1
-        per_page:
-          type: integer
-          description: Number of records per page.
-          example: 20
-        total_pages:
-          type: integer
-          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
-          example: 3
-        request_id:
-          type: string
-          format: uuid
-          description: Unique identifier for this API request.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - total
-      - page
-      - per_page
-      - total_pages
-      - request_id
     AiGatewayPiiPolicy:
       type: object
       description: 'A tenant-scoped bundle of PII recognizers plus a default action, attached to an agent
@@ -4020,6 +3525,193 @@ components:
         created_at:
           type: string
           format: date-time
+    AiGatewayMcpTool:
+      type: object
+      description: A tool metadata row. It does not widen what the server advertises — that is the intersection of `allowed_tools`, the upstream's real tools and the token's tool scope.
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        mcp_server_id:
+          type: string
+          format: uuid
+        tool_name:
+          type: string
+        route_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        description:
+          type:
+          - string
+          - 'null'
+        input_schema:
+          type: object
+          additionalProperties: true
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AiGateway:
+      type: object
+      description: An AI gateway — the top-level container that agents are created under.
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Production AI
+        slug:
+          type: string
+          description: Write-once machine handle, unique within the tenant.
+          example: production-ai
+        description:
+          type:
+          - string
+          - 'null'
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+          description: 'Daily spend cap in USD across every agent AND MCP server under this gateway. Null means uncapped. Enforced since AIGW-150; before that it was stored and read by nothing.
+
+            '
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+          description: Monthly spend cap in USD. Null means uncapped.
+        budget_overage_action:
+          type: string
+          enum:
+          - block
+          - warn
+          description: 'What happens when this gateway''s daily or monthly cap is spent (AIGW-150). `block` refuses further requests on BOTH data planes — `/v1/ai` with `429 budget_exceeded`, `/v1/mcp` with a JSON-RPC error on `tools/call` — while `warn` serves and emits the `X-Knox-AI-Budget-*` headers. There is deliberately no `fallback`: that action swaps an agent''s route and model, which a gateway does not have. Gateways created before AIGW-150 that already carried a budget were backfilled to `warn`, because the columns enforced nothing before it.
+
+            '
+        status:
+          type: string
+          enum:
+          - active
+          - paused
+          - archived
+        paused_reason:
+          type:
+          - string
+          - 'null'
+        geo_velocity_action:
+          type: string
+          enum:
+          - 'off'
+          - warn
+          - block
+          description: What to do on an impossible-travel signal across the gateway's tokens.
+        model_aliases:
+          type: object
+          description: 'Model aliases shared by every agent under this gateway (AIGW-42): `{alias: real_model_id}`. Returned on every gateway read — see `UpdateAiGatewayRequest.model_aliases` for how resolution interacts with the per-agent model policy.
+
+            '
+          additionalProperties:
+            type: string
+            maxLength: 200
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        created_by:
+          type:
+          - string
+          - 'null'
+          description: The API key or user that created the gateway.
+      required:
+      - id
+      - name
+      - slug
+      - status
+      - created_at
+      - updated_at
+    AiGatewayPhantomToken:
+      type: object
+      description: A capability (phantom) token row. The plaintext is never returned here — only at mint time.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type:
+          - string
+          - 'null'
+        kind:
+          type: string
+          enum:
+          - agent
+          - read
+          - tool
+          - oneshot
+        prefix:
+          type: string
+          description: The non-secret token prefix, safe to display.
+        dpop_required:
+          type: boolean
+        scope_jsonb:
+          type: object
+          additionalProperties: true
+          description: The capability scope (providers/models) the token is bound to.
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        revoked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - kind
+      - prefix
+      - dpop_required
+      - created_at
+    AiGatewayUsageExport:
+      type: object
+      description: FinOps showback/chargeback rollup, aggregated by the requested dimension.
+      properties:
+        group_by:
+          type: string
+          description: 'The grouping dimension: `user`, `team`, `agent`, `model`, `provider`, or `tag:<key>`.'
+        period_days:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiGatewayUsageExportRow'
+      required:
+      - group_by
+      - period_days
+      - rows
     CreateAiGatewayAgentRequest:
       type: object
       required:
@@ -4276,57 +3968,354 @@ components:
           - string
           - 'null'
           format: uuid
-    RequestMeta:
+    CreateAiGatewayRequest:
       type: object
-      description: Metadata included with every API response.
+      required:
+      - name
+      - slug
       properties:
-        request_id:
+        name:
           type: string
+        slug:
+          type: string
+          description: Unique machine handle within the tenant.
+        description:
+          type:
+          - string
+          - 'null'
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+        budget_overage_action:
+          type: string
+          enum:
+          - block
+          - warn
+          description: 'What happens when the gateway''s cap is spent (AIGW-150). Defaults to `block`. No `fallback` — that action swaps an agent''s route and model, which a gateway does not have.
+
+            '
+    UpdateAiGatewayAgentRequest:
+      type: object
+      description: Only the provided fields are changed. Every writable column on an agent appears here — this schema is what the typed SDKs are generated and reviewed against, so a field missing from it becomes a field missing from them (AIGW-161).
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+          description: 'RENAMES the agent, which MOVES its data-plane URL: `agent_url` is computed from the slug rather than stored, so every caller pointed at the old URL gets a 404 from the moment this returns. The new URL is on this response — read it rather than reconstructing it.'
+        description:
+          type:
+          - string
+          - 'null'
+        primary_route_id:
+          type:
+          - string
+          - 'null'
           format: uuid
-          description: Unique identifier for this API request, useful for support and debugging.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - request_id
-    AiGatewayTokenExchangeResponse:
-      type: object
-      description: 'RFC 8693 §2.2.1 response. This is a bare OAuth body, NOT the `{data, meta}` envelope
-
-        the rest of `/v1` returns — an OAuth client parses this shape.
-
-        '
-      required:
-      - access_token
-      - issued_token_type
-      - token_type
-      - expires_in
-      properties:
-        access_token:
-          type: string
-          description: 'The capability token, returned ONCE. Send it as `Authorization: Bearer <token>`
-
-            to `/v1/ai` (agent kind) or `/v1/mcp/<slug>` (tool kind, resource-bound).
-
-            '
-          example: kp_live_a_8f3c1d2e5a7b9c0d1e2f3a4b5c6d7e8f_A1B2C3D4
-        issued_token_type:
+        fallback_route_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        default_model:
+          type:
+          - string
+          - 'null'
+        model_allowlist:
+          type: array
+          items:
+            type: string
+        model_denylist:
+          type: array
+          items:
+            type: string
+        model_rewrite:
+          type: object
+          additionalProperties:
+            type: string
+          maxProperties: 100
+          description: Map of requested model → substituted model. Values must be STRINGS (the server validates with a string map) and at most 100 entries.
+        budget_daily_usd:
+          type:
+          - number
+          - 'null'
+        budget_monthly_usd:
+          type:
+          - number
+          - 'null'
+        budget_per_call_max_tokens:
+          type:
+          - integer
+          - 'null'
+        budget_overage_action:
           type: string
           enum:
-          - urn:ietf:params:oauth:token-type:access_token
-        token_type:
+          - block
+          - warn
+          - fallback
+          description: What happens once a budget is exhausted. `fallback` needs `fallback_agent_id`; without one it behaves as `block`.
+        fallback_agent_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        streaming_enabled:
+          type: boolean
+        firewall_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        pii_redact_policy_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        pii_detokenize_response:
+          type: boolean
+          deprecated: true
+          description: AIGW-100 legacy alias for `pii_response_mode` (`true` -> `detokenize`, `false` -> `redact`). Still accepted; sending both with contradictory values is a 400.
+        pii_request_mode:
           type: string
           enum:
-          - Bearer
-        expires_in:
+          - 'off'
+          - tokenize
+          description: What happens to the PROMPT before it leaves KnoxCall. Default `tokenize`. Set `off` only for an agent whose payload must reach the provider byte-for-byte (structured tool-use JSON, for example) — it means prompts are forwarded unscanned.
+        pii_response_mode:
+          type: string
+          enum:
+          - redact
+          - detokenize
+          description: What happens to the provider's answer. Default `detokenize`.
+        pii_streaming_holdback_chars:
           type: integer
-          description: Lifetime in seconds, from the binding's `access_token_ttl_seconds` (default 900).
-          example: 900
-        scope:
+          description: How many characters of a STREAMED answer are held back while a detector decides. Larger catches an entity split across more chunks; smaller is lower latency.
+        pii_streaming_mode:
           type: string
-          description: 'The capability scope, JSON-encoded, for visibility only. The source of truth is
+          enum:
+          - holdback
+          - buffer
+          - monitor
+          description: How a streamed answer is rewritten. `holdback` releases text behind a sliding window; `buffer` withholds the whole answer until it is complete; `monitor` REPORTS detections without rewriting, so the raw value reaches the client — an observability mode, not a redaction one.
+        tags:
+          type: object
+          additionalProperties: true
+          description: FinOps attribution labels (cost_center/team/project/…) echoed onto this agent's usage rows.
+        cache_mode:
+          type: string
+          enum:
+          - 'off'
+          - exact
+          - semantic
+          description: '`semantic` additionally needs `cache_embedding_model`; without one the cache reports itself degraded and serves nothing.'
+        cache_ttl_seconds:
+          type: integer
+        cache_similarity_threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 'Cosine floor for a semantic cache hit, 0–1. Lower means more hits, and more wrong ones. NOT nullable: the column is `NOT NULL` and the validator is non-nullable, so an explicit `null` is a 400.'
+        cache_embedding_model:
+          type:
+          - string
+          - 'null'
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        output_schema:
+          type:
+          - object
+          - 'null'
+          additionalProperties: true
+          description: JSON Schema the answer is validated against.
+        output_validation_action:
+          type: string
+          enum:
+          - block
+          - retry
+          - warn
+        data_residency_region:
+          type:
+          - string
+          - 'null'
+        cmek_key_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        routing_policy:
+          $ref: '#/components/schemas/AiGatewayRoutingPolicy'
+        guardrail_webhook_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: 'HTTPS endpoint your own scanner listens on (AIGW-45). Every prompt — and, in `response`/`both` mode, every response — is POSTed to it for a verdict before it moves.
 
-            the capability HMAC bound into the token — editing this string changes nothing.
+
+            What it receives is the REDACTED, post-tokenization body: the same bytes the provider would get, never a resolved provider credential and never your KnoxCall token. Shipping raw PHI to a third party to ask whether it contains PHI would be the leak the gateway exists to prevent.
+
+
+            The destination is resolved and refused at write time AND on every call — a private, loopback, link-local or cloud-metadata address is a 400, because DNS is not a promise.
 
             '
+        guardrail_webhook_secret_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: 'Secret holding the HMAC-SHA256 key deliveries are signed with. The signature covers `<timestamp>.<body>` and travels in `x-knox-guardrail-signature` with the timestamp in `x-knox-guardrail-timestamp`, so a captured delivery is not replayable. Omit to send unsigned — the receiver then cannot prove the call came from KnoxCall.
+
+            '
+        guardrail_webhook_mode:
+          type: string
+          enum:
+          - 'off'
+          - request
+          - response
+          - both
+          description: 'Which directions are inspected. `response` and `both` evaluate the complete buffered response before it is sent, so an agent in those modes REFUSES a streaming request (400 `guardrail_streaming_unsupported`) rather than serving one past a control that could not run on it.
+
+            '
+        guardrail_webhook_timeout_ms:
+          type: integer
+          minimum: 100
+          maximum: 10000
+          description: 'How long to wait for a verdict. Clamped, because a request waiting on your scanner is holding one of the gateway''s API workers.
+
+            '
+        guardrail_webhook_failure_action:
+          type: string
+          enum:
+          - fail_open
+          - fail_closed
+          description: 'What happens when the hook does not answer. Applies identically to EVERY non-answer — timeout, refused connection, refused destination, non-2xx, unparseable body, an `action` verb we do not recognise. Defaults to `fail_open`, which is the posture an agent already has with no hook at all.
+
+
+            A hook responds `200` with `{"action":"allow"|"block"|"flag","reason":"…"}`. `block` refuses the request with 400 `guardrail_block` and your `reason` in the message; `flag` serves it and records the outcome.
+
+            '
+    AiGatewayFirewallTestResult:
+      type: object
+      properties:
+        matched:
+          type: boolean
+        matches:
+          type: array
+          items:
+            type: object
+            properties:
+              rule:
+                type: string
+              span:
+                type: array
+                items:
+                  type: integer
+                minItems: 2
+                maxItems: 2
+              matched:
+                type: string
+        skipped:
+          type: array
+          description: Rules that could not be compiled and so did not run. Always empty for a validated request.
+          items:
+            type: object
+            properties:
+              rule:
+                type: string
+              reason:
+                type: string
+    AiGatewayPiiRecognizerTestResult:
+      type: object
+      properties:
+        matched:
+          type: boolean
+        matches:
+          type: array
+          items:
+            type: object
+            properties:
+              span:
+                type: array
+                items:
+                  type: integer
+                minItems: 2
+                maxItems: 2
+              matched:
+                type: string
+                description: The exact substring the pattern matched.
+              replacement:
+                type: string
+                description: What the data plane would substitute for it.
+              entity_type:
+                type: string
+    AiGatewayUsageTotals:
+      type: object
+      properties:
+        requests:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        cost_usd:
+          type: number
+        unpriced_requests:
+          type: integer
+    AiGatewayUsageByModel:
+      type: object
+      properties:
+        provider:
+          type: string
+        model:
+          type: string
+        requests:
+          type: integer
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        cost_usd:
+          type: number
+        unpriced_requests:
+          type: integer
+          description: Requests with no price data (excluded from cost).
+    OAuthError:
+      type: object
+      description: OAuth 2.1 error response (RFC 6749 §5.2). The OAuth endpoints use this shape rather than the /v1 `ErrorResponse` envelope.
+      required:
+      - error
+      properties:
+        error:
+          type: string
+          enum:
+          - invalid_request
+          - invalid_client
+          - invalid_grant
+          - unauthorized_client
+          - unsupported_grant_type
+          - invalid_scope
+          - access_denied
+          - authorization_pending
+          - slow_down
+          - expired_token
+          - invalid_target
+          - server_error
+          description: A single ASCII error code from RFC 6749 §5.2 / RFC 8628 §3.5 / RFC 8693 §2.2.2.
+          example: invalid_grant
+        error_description:
+          type: string
+          description: Human-readable explanation of the error.
+        error_uri:
+          type: string
+          format: uri
+          description: URI of a human-readable web page with error information.
     AiGatewayFirewallPolicyCreate:
       type: object
       required:
@@ -4349,9 +4338,9 @@ components:
           - warn
           - tag
           default: warn
-    AiGatewayFirewallPolicy:
+    AiGatewayPiiRecognizer:
       type: object
-      description: A tenant-scoped prompt-firewall policy, attachable to agents and MCP servers.
+      description: One tenant-defined PII detector.
       properties:
         id:
           type: string
@@ -4361,54 +4350,166 @@ components:
           format: uuid
         name:
           type: string
-        version:
-          type: integer
-          description: Bumped when a policy is re-created under the same name.
-        heuristics:
-          type: array
-          description: Tenant rules. The built-in prompt-injection patterns always run in addition to these.
-          items:
-            $ref: '#/components/schemas/AiGatewayFirewallRule'
-        canary_enabled:
-          type:
-          - boolean
-          - 'null'
-          description: Inject a canary token into the system prompt and flag it if the model echoes it back.
-        action:
+        kind:
           type: string
           enum:
-          - block
-          - warn
-          - tag
-        created_at:
+          - regex
+          - aho_corasick
+          - presidio_pattern
+          - presidio_ner
+          - presidio_custom
+          description: '`regex` and `aho_corasick` run in-process; the three `presidio_*` kinds are handed
+
+            to a Presidio sidecar.
+
+            '
+        pattern:
           type: string
-          format: date-time
-    AiGatewayPiiPolicyCreate:
-      type: object
-      required:
-      - name
-      properties:
-        name:
-          type: string
-          description: 2-64 chars (letters, digits, space, underscore, hyphen). Unique per tenant.
-          example: HIPAA
-        recognizer_ids:
+        context_words:
           type: array
-          description: Must all be recognizers this tenant owns; a foreign id is a 400 `recognizer_not_found`.
+          description: Words that must appear nearby for a match to count.
           items:
             type: string
-            format: uuid
-        default_action:
+        confidence:
+          type: number
+          format: float
+        action:
           type: string
           enum:
           - redact
           - tokenize
           - whitelist
           - warn
-          default: redact
-        description:
+        format:
+          type:
+          - string
+          - 'null'
+          description: Token format for `tokenize`; null otherwise.
+        enabled:
+          type: boolean
+          description: False mutes the recognizer without losing its definition.
+        created_at:
           type: string
-          maxLength: 1000
+          format: date-time
+    AiGatewayDataPlaneError:
+      type: object
+      description: 'AIGW-163 — the ONE error envelope of the AI data plane, served by `/v1/ai/*` and by
+
+        every layer in front of it (authentication, the audience guard, the rate limiter,
+
+        the boot sentinel).
+
+
+        It is NOT the `{error: {type, message, request_id}}` envelope the rest of `/v1`
+
+        uses. That one belongs to the Management API, which is a different plane with a
+
+        different credential; this one is what a governed proxy can answer beside a
+
+        provider''s own body. `/v1/mcp` answers JSON-RPC 2.0 and `/v1/oauth/token` answers
+
+        RFC 6749 §5.2, both by their protocols'' rules.
+
+
+        **`error` and `code` always carry the same value.** That is deliberate: three
+
+        incompatible shapes existed here before AIGW-163 and they disagreed about which of
+
+        the two was machine-readable, so both are now, and a client that reads either keeps
+
+        working. Branch on the identifier, never on `error_description` — descriptions are
+
+        rewritten whenever a clearer wording is found.
+
+
+        Some refusals add extra keys alongside the three (`utilization_pct`, `model`,
+
+        `request_id`). Ignore keys you do not recognise; new ones are additive.
+
+        '
+      required:
+      - error
+      - error_description
+      - code
+      additionalProperties: true
+      properties:
+        error:
+          type: string
+          description: Machine-readable identifier. Identical to `code`.
+          example: budget_exceeded
+        error_description:
+          type: string
+          description: Human-readable sentence. Never parse it.
+          example: 'Daily budget exceeded: $50.0031 ≥ $50'
+        code:
+          type: string
+          description: Machine-readable identifier. Identical to `error`.
+          example: budget_exceeded
+    AiGatewayRoutingPolicy:
+      type: object
+      description: 'How this agent retries and spreads load (AIGW-42). An empty object — the default for every agent — means one attempt per route and fail-over to `fallback_route_ids` on 5xx only, which is the behaviour the gateway has always had.
+
+
+        Every field is clamped server-side. A request parked waiting to retry occupies an API worker, so `max_attempts` caps at 5, any single delay at 30s, a honoured `Retry-After` at 60s, and the total sleep for one request at 60s regardless of how the fields combine.
+
+        '
+      additionalProperties: false
+      properties:
+        retry_on:
+          type: array
+          description: 'Which outcomes are retried on the SAME route before failing over. `429` also promotes a rate-limit response to a fail-over trigger; without it a 429 is returned to you immediately, unchanged.
+
+            '
+          items:
+            type: string
+            enum:
+            - '429'
+            - 5xx
+            - timeout
+        max_attempts:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 'Attempts per candidate route, including the first. Forced to 1 when `retry_on` is empty, so a stored policy never claims a retry that cannot happen.
+
+            '
+        backoff_ms:
+          type: integer
+          minimum: 0
+          maximum: 30000
+          description: Delay before the second attempt.
+        backoff_multiplier:
+          type: number
+          minimum: 1
+          maximum: 10
+        max_backoff_ms:
+          type: integer
+          minimum: 0
+          maximum: 30000
+        respect_retry_after:
+          type: boolean
+          description: 'Default true. An upstream `Retry-After` is honoured when it asks for LONGER than the computed backoff — it can extend a wait, never shorten one.
+
+            '
+        max_retry_after_ms:
+          type: integer
+          minimum: 0
+          maximum: 60000
+          description: Ceiling on a honoured `Retry-After`.
+        jitter:
+          type: boolean
+          description: 'Default true. Spreads each delay across 50–100% of its computed value so a fleet does not retry in lockstep.
+
+            '
+        route_weights:
+          type: object
+          description: '`{route_id: weight}`. When present, the route that serves a request is chosen in proportion to its weight across the primary and every fallback, and the remainder stay in weighted order for fail-over. A route not named here keeps weight 1; a route weighted 0 is drained and receives no traffic at all, including fail-over traffic. The token''s own capability scope is enforced on every candidate, so a weight can never reach a route the token was not granted.
+
+            '
+          additionalProperties:
+            type: integer
+            minimum: 0
+            maximum: 1000
     UpdateAiGatewayMcpServerRequest:
       type: object
       properties:
@@ -4478,108 +4579,83 @@ components:
           enum:
           - fail_open
           - fail_closed
-    AiGateway:
-      type: object
-      description: An AI gateway — the top-level container that agents are created under.
-      properties:
-        id:
-          type: string
-          format: uuid
-        tenant_id:
-          type: string
-          format: uuid
-        name:
-          type: string
-          example: Production AI
-        slug:
-          type: string
-          description: Write-once machine handle, unique within the tenant.
-          example: production-ai
-        description:
-          type:
-          - string
-          - 'null'
-        budget_daily_usd:
-          type:
-          - number
-          - 'null'
-          description: 'Daily spend cap in USD across every agent AND MCP server under this gateway. Null means uncapped. Enforced since AIGW-150; before that it was stored and read by nothing.
-
-            '
-        budget_monthly_usd:
-          type:
-          - number
-          - 'null'
-          description: Monthly spend cap in USD. Null means uncapped.
-        budget_overage_action:
-          type: string
-          enum:
-          - block
-          - warn
-          description: 'What happens when this gateway''s daily or monthly cap is spent (AIGW-150). `block` refuses further requests on BOTH data planes — `/v1/ai` with `429 budget_exceeded`, `/v1/mcp` with a JSON-RPC error on `tools/call` — while `warn` serves and emits the `X-Knox-AI-Budget-*` headers. There is deliberately no `fallback`: that action swaps an agent''s route and model, which a gateway does not have. Gateways created before AIGW-150 that already carried a budget were backfilled to `warn`, because the columns enforced nothing before it.
-
-            '
-        status:
-          type: string
-          enum:
-          - active
-          - paused
-          - archived
-        paused_reason:
-          type:
-          - string
-          - 'null'
-        geo_velocity_action:
-          type: string
-          enum:
-          - 'off'
-          - warn
-          - block
-          description: What to do on an impossible-travel signal across the gateway's tokens.
-        model_aliases:
-          type: object
-          description: 'Model aliases shared by every agent under this gateway (AIGW-42): `{alias: real_model_id}`. Returned on every gateway read — see `UpdateAiGatewayRequest.model_aliases` for how resolution interacts with the per-agent model policy.
-
-            '
-          additionalProperties:
-            type: string
-            maxLength: 200
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        created_by:
-          type:
-          - string
-          - 'null'
-          description: The API key or user that created the gateway.
-      required:
-      - id
-      - name
-      - slug
-      - status
-      - created_at
-      - updated_at
-    UpsertAiGatewayMcpToolRequest:
-      type: object
-      required:
-      - tool_name
-      properties:
-        tool_name:
-          type: string
-        description:
-          type:
-          - string
-          - 'null'
-        input_schema:
-          type: object
-          additionalProperties: true
-        enabled:
-          type: boolean
-          default: true
   responses:
+    McpUnprocessable:
+      description: 'The MCP server definition was refused. `plaintext_auth` — an `auth.headers`
+
+        value is a literal credential rather than a `{{secret_id:<uuid>}}`
+
+        reference. `validation` — `upstream_url` is not a public https address, or
+
+        a field failed validation. `unsupported_server_type` — `collection` is not
+
+        served yet.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            plaintext_auth:
+              summary: A literal credential in auth.headers
+              value:
+                error:
+                  type: validation
+                  message: auth.headers["Authorization"] must reference a KnoxCall secret, e.g. "Bearer {{secret_id:<uuid>}}".
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            blocked_destination:
+              summary: upstream_url resolves to a private address
+              value:
+                error:
+                  type: validation
+                  message: 'upstream_url is not a valid MCP destination: "169.254.169.254" is in a private/reserved range.'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            unsupported_server_type:
+              summary: collection is not served yet
+              value:
+                error:
+                  type: unsupported_server_type
+                  message: server_type 'collection' is not served yet - an MCP server must proxy an upstream MCP server (server_type 'upstream').
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    PlanLimit:
+      description: 'Payment Required. The action exceeds your plan''s limits. Two `error.type` values
+
+        share this status: `plan_limit` when a COUNTED resource quota was reached (routes,
+
+        secrets, AI agents, MCP servers), and `plan_feature` when the CAPABILITY itself is
+
+        not on your tier (custom PII redaction policies, compliance packs, custom
+
+        prompt-firewall policies). Both mean "upgrade to proceed"; branch on `type` only if
+
+        you want to distinguish "you have used your allowance" from "buy a bigger plan".
+
+
+        Neither ever revokes something you already have: a plan downgrade leaves existing
+
+        agents, policies and installed packs in place and keeps working.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: plan_limit
+              message: Route limit reached (10). Upgrade your plan to add more.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
     AiGatewayDataPlaneError:
       description: 'A refusal on the AI data plane, in the one envelope every layer answers with
 
@@ -4653,108 +4729,6 @@ components:
                 error: pii_policy_degraded
                 error_description: One or more PII recognizers failed to compile, so redaction would be only partly applied. The request was refused rather than forwarded unprotected.
                 code: pii_policy_degraded
-    PlanLimit:
-      description: 'Payment Required. The action exceeds your plan''s limits. Two `error.type` values
-
-        share this status: `plan_limit` when a COUNTED resource quota was reached (routes,
-
-        secrets, AI agents, MCP servers), and `plan_feature` when the CAPABILITY itself is
-
-        not on your tier (custom PII redaction policies, compliance packs, custom
-
-        prompt-firewall policies). Both mean "upgrade to proceed"; branch on `type` only if
-
-        you want to distinguish "you have used your allowance" from "buy a bigger plan".
-
-
-        Neither ever revokes something you already have: a plan downgrade leaves existing
-
-        agents, policies and installed packs in place and keeps working.
-
-        '
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: plan_limit
-              message: Route limit reached (10). Upgrade your plan to add more.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    ValidationError:
-      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            validation_error:
-              summary: Request body failed validation
-              value:
-                error:
-                  type: validation_error
-                  message: name and target_base_url are required.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            invalid_idempotency_key:
-              summary: Malformed idempotency key
-              value:
-                error:
-                  type: invalid_idempotency_key
-                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-    McpUnprocessable:
-      description: 'The MCP server definition was refused. `plaintext_auth` — an `auth.headers`
-
-        value is a literal credential rather than a `{{secret_id:<uuid>}}`
-
-        reference. `validation` — `upstream_url` is not a public https address, or
-
-        a field failed validation. `unsupported_server_type` — `collection` is not
-
-        served yet.
-
-        '
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            plaintext_auth:
-              summary: A literal credential in auth.headers
-              value:
-                error:
-                  type: validation
-                  message: auth.headers["Authorization"] must reference a KnoxCall secret, e.g. "Bearer {{secret_id:<uuid>}}".
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            blocked_destination:
-              summary: upstream_url resolves to a private address
-              value:
-                error:
-                  type: validation
-                  message: 'upstream_url is not a valid MCP destination: "169.254.169.254" is in a private/reserved range.'
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            unsupported_server_type:
-              summary: collection is not served yet
-              value:
-                error:
-                  type: unsupported_server_type
-                  message: server_type 'collection' is not served yet - an MCP server must proxy an upstream MCP server (server_type 'upstream').
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
     Forbidden:
       description: 'The key is authenticated but not authorized for this action (missing scope), a plan
 
@@ -4794,22 +4768,6 @@ components:
                   type: system_client_protected
                   message: This client is managed by the platform and cannot be modified.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
-    Conflict:
-      description: A resource with the same unique identifier already exists, or the resource is in use.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: conflict
-              message: A route with this name already exists.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
     NotFound:
       description: The requested resource was not found.
       headers:
@@ -4826,8 +4784,8 @@ components:
               type: not_found
               message: Route not found.
               request_id: 550e8400-e29b-41d4-a716-446655440000
-    InternalError:
-      description: An unexpected server error occurred.
+    Conflict:
+      description: A resource with the same unique identifier already exists, or the resource is in use.
       headers:
         X-Request-Id:
           $ref: '#/components/headers/X-Request-Id'
@@ -4839,8 +4797,8 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              type: internal_error
-              message: An unexpected error occurred.
+              type: conflict
+              message: A route with this name already exists.
               request_id: 550e8400-e29b-41d4-a716-446655440000
     Unauthorized:
       description: Authentication is required or the provided API key is invalid.
@@ -4868,17 +4826,49 @@ components:
                   type: invalid_api_key
                   message: Invalid API key.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
+    InternalError:
+      description: An unexpected server error occurred.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: internal_error
+              message: An unexpected error occurred.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
   headers:
-    X-Request-Id:
-      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
-
-        to the `request_id` field in the response body. Quote it when contacting support.
-
-        '
-      schema:
-        type: string
-        format: uuid
-      example: 550e8400-e29b-41d4-a716-446655440000
     KnoxCall-Version:
       description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
 
@@ -4889,7 +4879,25 @@ components:
         type: string
         pattern: ^\d{4}-\d{2}-\d{2}$
       example: '2026-08-05'
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
   parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
     PerPageParam:
       name: per_page
       in: query
@@ -4899,14 +4907,6 @@ components:
         maximum: 100
         default: 20
       description: Number of items per page (max 100).
-    PageParam:
-      name: page
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        default: 1
-      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
   securitySchemes:
     OAuth2:
       type: oauth2

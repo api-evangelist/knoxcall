@@ -484,23 +484,6 @@ paths:
           $ref: '#/components/responses/InternalError'
 components:
   schemas:
-    UpdateClientRequest:
-      type: object
-      description: All fields are optional. Only provided fields will be updated.
-      properties:
-        name:
-          type: string
-        type:
-          type: string
-          enum:
-          - user
-          - server
-        ip_address:
-          type: string
-        description:
-          type: string
-        enabled:
-          type: boolean
     CreateClientCredentialRequest:
       type: object
       required:
@@ -533,6 +516,248 @@ components:
               enum:
               - issue
               description: 'Set to `issue` to have KnoxCall mint a client certificate (kind: `mtls_thumbprint`).'
+    RequestMeta:
+      type: object
+      description: Metadata included with every API response.
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    CreateClientRequest:
+      type: object
+      required:
+      - name
+      - ip_address
+      properties:
+        name:
+          type: string
+          description: Human-readable name for the client.
+          example: Production Backend
+        type:
+          type: string
+          enum:
+          - user
+          - server
+          description: Client type. Defaults to `server` if not specified.
+          default: server
+          example: server
+        ip_address:
+          type: string
+          description: 'IP address or CIDR range to authorize. Supports individual IPs (e.g. `203.0.113.42`),
+
+            CIDR notation (e.g. `203.0.113.0/24`), and IPv6 addresses.
+
+            '
+          example: 203.0.113.0/24
+        description:
+          type: string
+          description: Optional description.
+          example: Main backend server pool
+    ClientCredentialCreated:
+      allOf:
+      - $ref: '#/components/schemas/ClientCredential'
+      - type: object
+        properties:
+          reveal:
+            type: object
+            description: 'One-shot PEM bundle, present only for `mtls_thumbprint` with `mode: issue`. **Returned exactly once and never stored.**'
+            properties:
+              certificate_pem:
+                type: string
+                description: The issued client certificate (PEM).
+              private_key_pem:
+                type: string
+                description: The certificate's private key (PEM). **Shown only in this response.**
+              ca_chain_pem:
+                type: string
+                description: The issuing CA chain (PEM).
+    Client:
+      type: object
+      description: An authorized client (user or server) with IP-based access control.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: b8d2e9f4-3a5c-4d7b-9e0f-2a4c6b8d0e1f
+        name:
+          type: string
+          description: Human-readable name for the client.
+          example: Production Backend
+        type:
+          type: string
+          enum:
+          - user
+          - server
+          description: Client type -- `user` for individual users, `server` for backend services.
+          example: server
+        ip_address:
+          type: string
+          description: IP address, CIDR range, or IP range authorized for this client.
+          example: 203.0.113.0/24
+        ip_notes:
+          type: object
+          additionalProperties: true
+          description: Notes about the IP address configuration, keyed by IP.
+        description:
+          type:
+          - string
+          - 'null'
+          description: Optional description of the client.
+          example: Main backend server pool
+        enabled:
+          type: boolean
+          description: Whether the client is active.
+          example: true
+        collection_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Collection this client belongs to, if any.
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2025-03-16T08:00:00.000Z'
+    PaginationMeta:
+      type: object
+      description: Pagination metadata for list endpoints.
+      properties:
+        total:
+          type: integer
+          description: Total number of records matching the query.
+          example: 42
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        per_page:
+          type: integer
+          description: Number of records per page.
+          example: 20
+        total_pages:
+          type: integer
+          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
+          example: 3
+        request_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this API request.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - total
+      - page
+      - per_page
+      - total_pages
+      - request_id
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
+    DeletedResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            deleted:
+              type: boolean
+              example: true
+          required:
+          - deleted
+        meta:
+          $ref: '#/components/schemas/RequestMeta'
+      required:
+      - data
+      - meta
+    ClientFull:
+      description: Full client row as returned by create and update operations.
+      allOf:
+      - $ref: '#/components/schemas/Client'
+      - type: object
+        properties:
+          tenant_id:
+            type: string
+            format: uuid
+          created_by:
+            type:
+            - string
+            - 'null'
+          agent_version:
+            type:
+            - string
+            - 'null'
+          agent_os:
+            type:
+            - string
+            - 'null'
+          agent_arch:
+            type:
+            - string
+            - 'null'
+          agent_hostname:
+            type:
+            - string
+            - 'null'
+          agent_last_seen:
+            type:
+            - string
+            - 'null'
+            format: date-time
+          agent_mode:
+            type:
+            - string
+            - 'null'
+    ClientDetail:
+      description: Extended client object with route assignments.
+      allOf:
+      - $ref: '#/components/schemas/Client'
+      - type: object
+        properties:
+          route_assignments:
+            type: array
+            description: Routes this client is assigned to.
+            items:
+              type: object
+              properties:
+                route_id:
+                  type: string
+                  format: uuid
+                route_name:
+                  type: string
+                  example: stripe-payments
+                environment_name:
+                  type: string
+                  example: production
     ClientCredential:
       type: object
       description: A credential attached to a client. Secret material (HMAC secrets, private keys) is redacted from `data`.
@@ -593,306 +818,23 @@ components:
           - 'null'
           format: date-time
           description: When this credential last matched an incoming request.
-    DeletedResponse:
+    UpdateClientRequest:
       type: object
-      properties:
-        data:
-          type: object
-          properties:
-            deleted:
-              type: boolean
-              example: true
-          required:
-          - deleted
-        meta:
-          $ref: '#/components/schemas/RequestMeta'
-      required:
-      - data
-      - meta
-    ErrorResponse:
-      type: object
-      description: Standard error response envelope.
-      properties:
-        error:
-          type: object
-          properties:
-            type:
-              type: string
-              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
-              example: validation_error
-            message:
-              type: string
-              description: Human-readable error message.
-              example: name and target_base_url are required.
-            request_id:
-              type: string
-              format: uuid
-              description: Unique identifier for this request.
-              example: 550e8400-e29b-41d4-a716-446655440000
-          required:
-          - type
-          - message
-          - request_id
-      required:
-      - error
-    ClientFull:
-      description: Full client row as returned by create and update operations.
-      allOf:
-      - $ref: '#/components/schemas/Client'
-      - type: object
-        properties:
-          tenant_id:
-            type: string
-            format: uuid
-          created_by:
-            type:
-            - string
-            - 'null'
-          agent_version:
-            type:
-            - string
-            - 'null'
-          agent_os:
-            type:
-            - string
-            - 'null'
-          agent_arch:
-            type:
-            - string
-            - 'null'
-          agent_hostname:
-            type:
-            - string
-            - 'null'
-          agent_last_seen:
-            type:
-            - string
-            - 'null'
-            format: date-time
-          agent_mode:
-            type:
-            - string
-            - 'null'
-    PaginationMeta:
-      type: object
-      description: Pagination metadata for list endpoints.
-      properties:
-        total:
-          type: integer
-          description: Total number of records matching the query.
-          example: 42
-        page:
-          type: integer
-          description: Current page number.
-          example: 1
-        per_page:
-          type: integer
-          description: Number of records per page.
-          example: 20
-        total_pages:
-          type: integer
-          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
-          example: 3
-        request_id:
-          type: string
-          format: uuid
-          description: Unique identifier for this API request.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - total
-      - page
-      - per_page
-      - total_pages
-      - request_id
-    RequestMeta:
-      type: object
-      description: Metadata included with every API response.
-      properties:
-        request_id:
-          type: string
-          format: uuid
-          description: Unique identifier for this API request, useful for support and debugging.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - request_id
-    ClientCredentialCreated:
-      allOf:
-      - $ref: '#/components/schemas/ClientCredential'
-      - type: object
-        properties:
-          reveal:
-            type: object
-            description: 'One-shot PEM bundle, present only for `mtls_thumbprint` with `mode: issue`. **Returned exactly once and never stored.**'
-            properties:
-              certificate_pem:
-                type: string
-                description: The issued client certificate (PEM).
-              private_key_pem:
-                type: string
-                description: The certificate's private key (PEM). **Shown only in this response.**
-              ca_chain_pem:
-                type: string
-                description: The issuing CA chain (PEM).
-    ClientDetail:
-      description: Extended client object with route assignments.
-      allOf:
-      - $ref: '#/components/schemas/Client'
-      - type: object
-        properties:
-          route_assignments:
-            type: array
-            description: Routes this client is assigned to.
-            items:
-              type: object
-              properties:
-                route_id:
-                  type: string
-                  format: uuid
-                route_name:
-                  type: string
-                  example: stripe-payments
-                environment_name:
-                  type: string
-                  example: production
-    CreateClientRequest:
-      type: object
-      required:
-      - name
-      - ip_address
+      description: All fields are optional. Only provided fields will be updated.
       properties:
         name:
           type: string
-          description: Human-readable name for the client.
-          example: Production Backend
         type:
           type: string
           enum:
           - user
           - server
-          description: Client type. Defaults to `server` if not specified.
-          default: server
-          example: server
         ip_address:
           type: string
-          description: 'IP address or CIDR range to authorize. Supports individual IPs (e.g. `203.0.113.42`),
-
-            CIDR notation (e.g. `203.0.113.0/24`), and IPv6 addresses.
-
-            '
-          example: 203.0.113.0/24
         description:
           type: string
-          description: Optional description.
-          example: Main backend server pool
-    Client:
-      type: object
-      description: An authorized client (user or server) with IP-based access control.
-      properties:
-        id:
-          type: string
-          format: uuid
-          example: b8d2e9f4-3a5c-4d7b-9e0f-2a4c6b8d0e1f
-        name:
-          type: string
-          description: Human-readable name for the client.
-          example: Production Backend
-        type:
-          type: string
-          enum:
-          - user
-          - server
-          description: Client type -- `user` for individual users, `server` for backend services.
-          example: server
-        ip_address:
-          type: string
-          description: IP address, CIDR range, or IP range authorized for this client.
-          example: 203.0.113.0/24
-        ip_notes:
-          type: object
-          additionalProperties: true
-          description: Notes about the IP address configuration, keyed by IP.
-        description:
-          type:
-          - string
-          - 'null'
-          description: Optional description of the client.
-          example: Main backend server pool
         enabled:
           type: boolean
-          description: Whether the client is active.
-          example: true
-        collection_id:
-          type:
-          - string
-          - 'null'
-          format: uuid
-          description: Collection this client belongs to, if any.
-        created_at:
-          type: string
-          format: date-time
-          example: '2025-03-15T10:30:00.000Z'
-        updated_at:
-          type: string
-          format: date-time
-          example: '2025-03-16T08:00:00.000Z'
-  parameters:
-    OrderParam:
-      name: order
-      in: query
-      schema:
-        type: string
-        enum:
-        - asc
-        - desc
-        default: desc
-      description: Sort direction.
-    PerPageParam:
-      name: per_page
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 20
-      description: Number of items per page (max 100).
-    PageParam:
-      name: page
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        default: 1
-      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
-    ClientId:
-      name: id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-      description: The client UUID.
-      example: b8d2e9f4-3a5c-4d7b-9e0f-2a4c6b8d0e1f
-    IdempotencyKeyParam:
-      name: X-Idempotency-Key
-      in: header
-      required: false
-      schema:
-        type: string
-        maxLength: 255
-      description: 'Optional idempotency key so a retried mutating request is executed at most once.
-
-        The standard `Idempotency-Key` spelling is also accepted. Replaying a completed
-
-        request with the same key returns the original stored response with an
-
-        `X-Idempotent-Replay: true` header. A key still in progress returns
-
-        `409 request_in_progress`; the same key with a different body returns
-
-        `422 idempotency_key_reuse`; a malformed key returns `400 invalid_idempotency_key`.
-
-        '
-      example: 3f6c9b2e-1a4d-4c8e-9b0a-7d2e5f1c3a8b
   responses:
     PlanLimit:
       description: 'Payment Required. The action exceeds your plan''s limits. Two `error.type` values
@@ -927,6 +869,146 @@ components:
               type: plan_limit
               message: Route limit reached (10). Upgrade your plan to add more.
               request_id: 550e8400-e29b-41d4-a716-446655440000
+    NotFound:
+      description: The requested resource was not found.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: not_found
+              message: Route not found.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    InternalError:
+      description: An unexpected server error occurred.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: internal_error
+              message: An unexpected error occurred.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    Unauthorized:
+      description: Authentication is required or the provided API key is invalid.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_key:
+              summary: No API key provided
+              value:
+                error:
+                  type: authentication_required
+                  message: 'API key is required. Use Authorization: Bearer <api_key> or x-api-key header.'
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_key:
+              summary: Invalid API key
+              value:
+                error:
+                  type: invalid_api_key
+                  message: Invalid API key.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    RequestInProgress:
+      description: 'A request with the same idempotency key is still being processed. Retry after a
+
+        short delay; do not change the request body.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: request_in_progress
+              message: A request with this idempotency key is already in progress.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    IdempotencyKeyReuse:
+      description: 'The supplied idempotency key was already used for a request with a different body.
+
+        Idempotency keys may only be reused with an identical request.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: idempotency_key_reuse
+              message: This idempotency key was already used with a different request body.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    ClientNameConflictOrRequestInProgress:
+      description: "Either of two conflicts, distinguished by `error.type`:\n\n* `conflict` — a client with this name already exists in the caller's own\n  data space. Client names are unique per `(tenant, name, Live/Test)`, so\n  the same machine MAY be registered under one name in both Live and Test,\n  but not twice within one of them. Choose a different name; retrying the\n  same one will never succeed.\n* `request_in_progress` — a request with the same idempotency key is still\n  being processed. Retry after a short delay; do not change the body.\n"
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: conflict
+              message: A client with this name already exists.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
     RateLimited:
       description: 'Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
 
@@ -955,166 +1037,16 @@ components:
               type: rate_limit_exceeded
               message: API rate limit exceeded. Please retry later.
               request_id: 550e8400-e29b-41d4-a716-446655440000
-    ValidationError:
-      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            validation_error:
-              summary: Request body failed validation
-              value:
-                error:
-                  type: validation_error
-                  message: name and target_base_url are required.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            invalid_idempotency_key:
-              summary: Malformed idempotency key
-              value:
-                error:
-                  type: invalid_idempotency_key
-                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-    NotFound:
-      description: The requested resource was not found.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: not_found
-              message: Route not found.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    RequestInProgress:
-      description: 'A request with the same idempotency key is still being processed. Retry after a
-
-        short delay; do not change the request body.
-
-        '
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: request_in_progress
-              message: A request with this idempotency key is already in progress.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    InternalError:
-      description: An unexpected server error occurred.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: internal_error
-              message: An unexpected error occurred.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    IdempotencyKeyReuse:
-      description: 'The supplied idempotency key was already used for a request with a different body.
-
-        Idempotency keys may only be reused with an identical request.
-
-        '
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: idempotency_key_reuse
-              message: This idempotency key was already used with a different request body.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    ClientNameConflictOrRequestInProgress:
-      description: "Either of two conflicts, distinguished by `error.type`:\n\n* `conflict` — a client with this name already exists in the caller's own\n  data space. Client names are unique per `(tenant, name, Live/Test)`, so\n  the same machine MAY be registered under one name in both Live and Test,\n  but not twice within one of them. Choose a different name; retrying the\n  same one will never succeed.\n* `request_in_progress` — a request with the same idempotency key is still\n  being processed. Retry after a short delay; do not change the body.\n"
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: conflict
-              message: A client with this name already exists.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    Unauthorized:
-      description: Authentication is required or the provided API key is invalid.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            missing_key:
-              summary: No API key provided
-              value:
-                error:
-                  type: authentication_required
-                  message: 'API key is required. Use Authorization: Bearer <api_key> or x-api-key header.'
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            invalid_key:
-              summary: Invalid API key
-              value:
-                error:
-                  type: invalid_api_key
-                  message: Invalid API key.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
   headers:
-    X-Request-Id:
-      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+    X-RateLimit-Remaining:
+      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
 
-        to the `request_id` field in the response body. Quote it when contacting support.
-
-        '
-      schema:
-        type: string
-        format: uuid
-      example: 550e8400-e29b-41d4-a716-446655440000
-    X-RateLimit-Reset:
-      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
-
-        response whenever a rate limit is configured for the authenticated key.
+        limit is configured for the authenticated key.
 
         '
       schema:
         type: integer
-      example: 1735689600
+      example: 999
     KnoxCall-Version:
       description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
 
@@ -1125,20 +1057,30 @@ components:
         type: string
         pattern: ^\d{4}-\d{2}-\d{2}$
       example: '2026-08-05'
-    X-RateLimit-Remaining:
-      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
 
-        limit is configured for the authenticated key.
+        to the `request_id` field in the response body. Quote it when contacting support.
 
         '
       schema:
-        type: integer
-      example: 999
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
     Retry-After:
       description: Seconds to wait before retrying. Set on `429` responses.
       schema:
         type: integer
       example: 30
+    X-RateLimit-Reset:
+      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
+
+        response whenever a rate limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1735689600
     X-RateLimit-Limit:
       description: 'Maximum requests allowed per window. Emitted on every response whenever a rate
 
@@ -1148,6 +1090,64 @@ components:
       schema:
         type: integer
       example: 1000
+  parameters:
+    OrderParam:
+      name: order
+      in: query
+      schema:
+        type: string
+        enum:
+        - asc
+        - desc
+        default: desc
+      description: Sort direction.
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
+    PerPageParam:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page (max 100).
+    ClientId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: The client UUID.
+      example: b8d2e9f4-3a5c-4d7b-9e0f-2a4c6b8d0e1f
+    IdempotencyKeyParam:
+      name: X-Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+      description: 'Optional idempotency key so a retried mutating request is executed at most once.
+
+        The standard `Idempotency-Key` spelling is also accepted. Replaying a completed
+
+        request with the same key returns the original stored response with an
+
+        `X-Idempotent-Replay: true` header. A key still in progress returns
+
+        `409 request_in_progress`; the same key with a different body returns
+
+        `422 idempotency_key_reuse`; a malformed key returns `400 invalid_idempotency_key`.
+
+        '
+      example: 3f6c9b2e-1a4d-4c8e-9b0a-7d2e5f1c3a8b
   securitySchemes:
     OAuth2:
       type: oauth2

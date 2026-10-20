@@ -702,69 +702,54 @@ paths:
               schema:
                 $ref: '#/components/schemas/OAuthServerMetadata'
 components:
-  headers:
-    X-Request-Id:
-      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
-
-        to the `request_id` field in the response body. Quote it when contacting support.
-
-        '
-      schema:
-        type: string
-        format: uuid
-      example: 550e8400-e29b-41d4-a716-446655440000
-    X-RateLimit-Reset:
-      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
-
-        response whenever a rate limit is configured for the authenticated key.
-
-        '
-      schema:
-        type: integer
-      example: 1735689600
-    KnoxCall-Version:
-      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
-
-        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
-
-        '
-      schema:
-        type: string
-        pattern: ^\d{4}-\d{2}-\d{2}$
-      example: '2026-08-05'
-    X-RateLimit-Remaining:
-      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
-
-        limit is configured for the authenticated key.
-
-        '
-      schema:
-        type: integer
-      example: 999
-    Retry-After:
-      description: Seconds to wait before retrying. Set on `429` responses.
-      schema:
-        type: integer
-      example: 30
-    X-RateLimit-Limit:
-      description: 'Maximum requests allowed per window. Emitted on every response whenever a rate
-
-        limit is configured for the authenticated key.
-
-        '
-      schema:
-        type: integer
-      example: 1000
   schemas:
-    OAuthIntrospectRequest:
+    UpdateOAuthClientRequest:
       type: object
-      description: OAuth token introspection request (RFC 7662 §2.1). Sent as `application/x-www-form-urlencoded`.
+      description: Any subset of fields may be supplied; at least one is required. Grant types cannot be changed after creation.
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        redirect_uris:
+          type: array
+          items:
+            type: string
+          description: Must use `https://` (or `http://localhost`).
+        require_dpop:
+          type: boolean
+        require_pkce:
+          type: boolean
+        active:
+          type: boolean
+        token_format:
+          type: string
+          enum:
+          - opaque
+          description: The only accepted value is `opaque`. Any other value — including the withdrawn RFC 9068 `jwt` — is refused with 400 and nothing is written.
+        consent_html_template:
+          type:
+          - string
+          - 'null'
+          maxLength: 65536
+          description: Custom consent-page HTML template. Pass null or an empty string to reset to the default. At most 65536 characters.
+        step_up_scopes:
+          type: array
+          items:
+            type: string
+          description: Scopes that require step-up authentication.
+    OAuthRevokeRequest:
+      type: object
+      description: OAuth token revocation request (RFC 7009 §2.1). Sent as `application/x-www-form-urlencoded`.
       required:
       - token
       properties:
         token:
           type: string
-          description: The token to introspect.
+          description: The token to revoke.
         token_type_hint:
           type: string
           enum:
@@ -773,63 +758,43 @@ components:
           description: Hint about the type of the token submitted.
         client_id:
           type: string
-          description: The introspecting client's identifier.
         client_secret:
           type: string
-          description: The introspecting client's secret.
-    CreateOAuthClientRequest:
+    OAuthDeviceAuthorizationResponse:
       type: object
+      description: OAuth device authorization response (RFC 8628 §3.2).
       required:
-      - name
+      - device_code
+      - user_code
+      - verification_uri
+      - expires_in
       properties:
-        name:
+        device_code:
           type: string
-          maxLength: 255
-          description: Human-readable client name. At most 255 characters.
-          example: CI token minting
-        type:
+          description: The device verification code.
+          example: GmRhmhcxhwEzkoEqiMEg_DnyEysNkuNhszIySk9eS
+        user_code:
           type: string
-          enum:
-          - confidential
-          - public
-          default: confidential
-        grant_types:
-          type: array
-          items:
-            type: string
-            enum:
-            - client_credentials
-            - authorization_code
-            - refresh_token
-            - urn:ietf:params:oauth:grant-type:token-exchange
-            - urn:ietf:params:oauth:grant-type:device_code
-          description: Grant types to enable. Defaults to `["client_credentials"]`.
-        allowed_scopes:
-          type: array
-          items:
-            type: string
-          example:
-          - routes:read
-          - secrets:read
-        redirect_uris:
-          type: array
-          items:
-            type: string
-          description: Required when the `authorization_code` grant is enabled. Must use `https://`, or `http://` on a loopback host (`localhost`, `127.0.0.1`, `[::1]`) for native/CLI apps per RFC 8252 §7.3 — loopback IP-literal URIs match on any port at authorization time.
-        require_dpop:
-          type: boolean
-          default: false
-          description: Require DPoP-bound tokens.
-        require_pkce:
-          type: boolean
-          default: true
-          description: Require PKCE for the authorization-code flow.
-        token_format:
+          description: The end-user verification code to enter at `verification_uri`.
+          example: WDJB-MJHT
+        verification_uri:
           type: string
-          enum:
-          - opaque
-          default: opaque
-          description: Optional; the only accepted value is `opaque`. Any other value — including the withdrawn RFC 9068 `jwt` — is refused with 400.
+          format: uri
+          description: The end-user verification URI.
+          example: https://knoxcall.com/device
+        verification_uri_complete:
+          type: string
+          format: uri
+          description: The verification URI with the `user_code` pre-filled (optional, RFC 8628).
+          example: https://knoxcall.com/device?user_code=WDJB-MJHT
+        expires_in:
+          type: integer
+          description: Lifetime of the `device_code` and `user_code` in seconds.
+          example: 900
+        interval:
+          type: integer
+          description: Minimum seconds the client should wait between polling `POST /oauth/token`.
+          example: 5
     OAuthDeviceAuthorizationRequest:
       type: object
       description: OAuth device authorization request (RFC 8628 §3.1). Sent as `application/x-www-form-urlencoded`.
@@ -914,139 +879,6 @@ components:
           - secrets:read
           - secrets:write
           - '*:*'
-    OAuthClientCreated:
-      type: object
-      description: The newly created OAuth client, including its one-time secret.
-      properties:
-        id:
-          type: string
-          format: uuid
-        client_id:
-          type: string
-          example: tk_1a2b3c4d
-        client_secret:
-          type:
-          - string
-          - 'null'
-          description: '**Shown exactly once — it can never be retrieved again.** Null for public clients.'
-        type:
-          type: string
-          enum:
-          - confidential
-          - public
-        grant_types:
-          type: array
-          items:
-            type: string
-        allowed_scopes:
-          type: array
-          items:
-            type: string
-        redirect_uris:
-          type: array
-          items:
-            type: string
-    OAuthTokenResponse:
-      type: object
-      description: OAuth 2.1 access token response (RFC 6749 §5.1).
-      required:
-      - access_token
-      - token_type
-      - expires_in
-      properties:
-        access_token:
-          type: string
-          description: The issued access token (JWT).
-          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
-        token_type:
-          type: string
-          enum:
-          - Bearer
-          example: Bearer
-        expires_in:
-          type: integer
-          description: Access token lifetime in seconds.
-          example: 3600
-        scope:
-          type: string
-          description: Space-delimited list of granted scopes (may be narrower than requested).
-          example: routes:read routes:write
-        refresh_token:
-          type: string
-          description: A refresh token, when the grant issues one.
-        tenant:
-          type: string
-          format: uuid
-          description: The tenant the token is scoped to.
-          example: 3b5d7c9e-1f2a-4b6d-8c0e-2a4c6b8d0e1f
-        client_id:
-          type: string
-          description: The client the token was issued to.
-          example: kc_client_abc123
-    ErrorResponse:
-      type: object
-      description: Standard error response envelope.
-      properties:
-        error:
-          type: object
-          properties:
-            type:
-              type: string
-              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
-              example: validation_error
-            message:
-              type: string
-              description: Human-readable error message.
-              example: name and target_base_url are required.
-            request_id:
-              type: string
-              format: uuid
-              description: Unique identifier for this request.
-              example: 550e8400-e29b-41d4-a716-446655440000
-          required:
-          - type
-          - message
-          - request_id
-      required:
-      - error
-    UpdateOAuthClientRequest:
-      type: object
-      description: Any subset of fields may be supplied; at least one is required. Grant types cannot be changed after creation.
-      properties:
-        name:
-          type: string
-          maxLength: 255
-        allowed_scopes:
-          type: array
-          items:
-            type: string
-        redirect_uris:
-          type: array
-          items:
-            type: string
-          description: Must use `https://` (or `http://localhost`).
-        require_dpop:
-          type: boolean
-        require_pkce:
-          type: boolean
-        active:
-          type: boolean
-        token_format:
-          type: string
-          enum:
-          - opaque
-          description: The only accepted value is `opaque`. Any other value — including the withdrawn RFC 9068 `jwt` — is refused with 400 and nothing is written.
-        consent_html_template:
-          type:
-          - string
-          - 'null'
-          maxLength: 65536
-          description: Custom consent-page HTML template. Pass null or an empty string to reset to the default. At most 65536 characters.
-        step_up_scopes:
-          type: array
-          items:
-            type: string
-          description: Scopes that require step-up authentication.
     OAuthClientDetail:
       type: object
       description: Full OAuth client detail.
@@ -1112,133 +944,73 @@ components:
           - string
           - 'null'
           format: uuid
-    OAuthError:
+    OAuthClientCreated:
       type: object
-      description: OAuth 2.1 error response (RFC 6749 §5.2). The OAuth endpoints use this shape rather than the /v1 `ErrorResponse` envelope.
-      required:
-      - error
+      description: The newly created OAuth client, including its one-time secret.
       properties:
-        error:
-          type: string
-          enum:
-          - invalid_request
-          - invalid_client
-          - invalid_grant
-          - unauthorized_client
-          - unsupported_grant_type
-          - invalid_scope
-          - access_denied
-          - authorization_pending
-          - slow_down
-          - expired_token
-          - invalid_target
-          - server_error
-          description: A single ASCII error code from RFC 6749 §5.2 / RFC 8628 §3.5 / RFC 8693 §2.2.2.
-          example: invalid_grant
-        error_description:
-          type: string
-          description: Human-readable explanation of the error.
-        error_uri:
-          type: string
-          format: uri
-          description: URI of a human-readable web page with error information.
-    OAuthTokenRequest:
-      type: object
-      description: OAuth 2.1 token request (RFC 6749 §4, RFC 8628 §3.4). Sent as `application/x-www-form-urlencoded`.
-      required:
-      - grant_type
-      properties:
-        grant_type:
-          type: string
-          enum:
-          - client_credentials
-          - authorization_code
-          - refresh_token
-          - urn:ietf:params:oauth:grant-type:device_code
-          description: The OAuth 2.1 grant type.
-          example: client_credentials
-        client_id:
-          type: string
-          description: The OAuth client identifier. Required for public clients; confidential clients may instead use HTTP Basic auth.
-        client_secret:
-          type: string
-          description: The OAuth client secret (confidential clients only).
-        scope:
-          type: string
-          description: Space-delimited list of requested scopes.
-          example: routes:read routes:write
-        code:
-          type: string
-          description: Authorization code (for `authorization_code` grant).
-        redirect_uri:
-          type: string
-          format: uri
-          description: Must match the redirect URI used in the authorization request (`authorization_code` grant).
-        code_verifier:
-          type: string
-          description: PKCE code verifier (RFC 7636). Required for public clients using the `authorization_code` grant.
-        refresh_token:
-          type: string
-          description: The refresh token (for `refresh_token` grant).
-        device_code:
-          type: string
-          description: The device code (for the device-code grant).
-    OAuthIntrospectionResponse:
-      type: object
-      description: OAuth token introspection response (RFC 7662 §2.2).
-      required:
-      - active
-      properties:
-        active:
-          type: boolean
-          description: Whether the token is currently active (not expired, not revoked, and known).
-          example: true
-        scope:
-          type: string
-          description: Space-delimited granted scopes.
-          example: routes:read
-        client_id:
-          type: string
-          example: kc_client_abc123
-        token_type:
-          type: string
-          example: Bearer
-        exp:
-          type: integer
-          description: Expiry time as epoch seconds.
-          example: 1735689600
-        iat:
-          type: integer
-          description: Issued-at time as epoch seconds.
-          example: 1735686000
-        sub:
-          type: string
-          description: Subject of the token.
-        require_dpop:
-          type: boolean
-          description: 'Non-standard member (RFC 7662 §2.2 permits extensions). `true` when the
-
-            token''s owning client is configured to require DPoP-bound tokens. A
-
-            resource server MUST refuse a token whose `cnf.jkt` is absent while this
-
-            is `true` — KnoxCall''s own data plane and `/v1` API both do.
-
-            '
-          example: false
-        tenant:
+        id:
           type: string
           format: uuid
-          description: The tenant the token is scoped to.
-    OAuthRevokeRequest:
+        client_id:
+          type: string
+          example: tk_1a2b3c4d
+        client_secret:
+          type:
+          - string
+          - 'null'
+          description: '**Shown exactly once — it can never be retrieved again.** Null for public clients.'
+        type:
+          type: string
+          enum:
+          - confidential
+          - public
+        grant_types:
+          type: array
+          items:
+            type: string
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        redirect_uris:
+          type: array
+          items:
+            type: string
+    ErrorResponse:
       type: object
-      description: OAuth token revocation request (RFC 7009 §2.1). Sent as `application/x-www-form-urlencoded`.
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
+    OAuthIntrospectRequest:
+      type: object
+      description: OAuth token introspection request (RFC 7662 §2.1). Sent as `application/x-www-form-urlencoded`.
       required:
       - token
       properties:
         token:
           type: string
-          description: The token to revoke.
+          description: The token to introspect.
         token_type_hint:
           type: string
           enum:
@@ -1247,43 +1019,63 @@ components:
           description: Hint about the type of the token submitted.
         client_id:
           type: string
+          description: The introspecting client's identifier.
         client_secret:
           type: string
-    OAuthDeviceAuthorizationResponse:
+          description: The introspecting client's secret.
+    CreateOAuthClientRequest:
       type: object
-      description: OAuth device authorization response (RFC 8628 §3.2).
       required:
-      - device_code
-      - user_code
-      - verification_uri
-      - expires_in
+      - name
       properties:
-        device_code:
+        name:
           type: string
-          description: The device verification code.
-          example: GmRhmhcxhwEzkoEqiMEg_DnyEysNkuNhszIySk9eS
-        user_code:
+          maxLength: 255
+          description: Human-readable client name. At most 255 characters.
+          example: CI token minting
+        type:
           type: string
-          description: The end-user verification code to enter at `verification_uri`.
-          example: WDJB-MJHT
-        verification_uri:
+          enum:
+          - confidential
+          - public
+          default: confidential
+        grant_types:
+          type: array
+          items:
+            type: string
+            enum:
+            - client_credentials
+            - authorization_code
+            - refresh_token
+            - urn:ietf:params:oauth:grant-type:token-exchange
+            - urn:ietf:params:oauth:grant-type:device_code
+          description: Grant types to enable. Defaults to `["client_credentials"]`.
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+          example:
+          - routes:read
+          - secrets:read
+        redirect_uris:
+          type: array
+          items:
+            type: string
+          description: Required when the `authorization_code` grant is enabled. Must use `https://`, or `http://` on a loopback host (`localhost`, `127.0.0.1`, `[::1]`) for native/CLI apps per RFC 8252 §7.3 — loopback IP-literal URIs match on any port at authorization time.
+        require_dpop:
+          type: boolean
+          default: false
+          description: Require DPoP-bound tokens.
+        require_pkce:
+          type: boolean
+          default: true
+          description: Require PKCE for the authorization-code flow.
+        token_format:
           type: string
-          format: uri
-          description: The end-user verification URI.
-          example: https://knoxcall.com/device
-        verification_uri_complete:
-          type: string
-          format: uri
-          description: The verification URI with the `user_code` pre-filled (optional, RFC 8628).
-          example: https://knoxcall.com/device?user_code=WDJB-MJHT
-        expires_in:
-          type: integer
-          description: Lifetime of the `device_code` and `user_code` in seconds.
-          example: 900
-        interval:
-          type: integer
-          description: Minimum seconds the client should wait between polling `POST /oauth/token`.
-          example: 5
+          enum:
+          - opaque
+          default: opaque
+          description: Optional; the only accepted value is `opaque`. Any other value — including the withdrawn RFC 9068 `jwt` — is refused with 400.
     OAuthClient:
       type: object
       description: An OAuth 2.1 client as returned in list responses.
@@ -1376,61 +1168,162 @@ components:
           - string
           - 'null'
           description: Key type of the source API key, if any.
+    OAuthTokenRequest:
+      type: object
+      description: OAuth 2.1 token request (RFC 6749 §4, RFC 8628 §3.4). Sent as `application/x-www-form-urlencoded`.
+      required:
+      - grant_type
+      properties:
+        grant_type:
+          type: string
+          enum:
+          - client_credentials
+          - authorization_code
+          - refresh_token
+          - urn:ietf:params:oauth:grant-type:device_code
+          description: The OAuth 2.1 grant type.
+          example: client_credentials
+        client_id:
+          type: string
+          description: The OAuth client identifier. Required for public clients; confidential clients may instead use HTTP Basic auth.
+        client_secret:
+          type: string
+          description: The OAuth client secret (confidential clients only).
+        scope:
+          type: string
+          description: Space-delimited list of requested scopes.
+          example: routes:read routes:write
+        code:
+          type: string
+          description: Authorization code (for `authorization_code` grant).
+        redirect_uri:
+          type: string
+          format: uri
+          description: Must match the redirect URI used in the authorization request (`authorization_code` grant).
+        code_verifier:
+          type: string
+          description: PKCE code verifier (RFC 7636). Required for public clients using the `authorization_code` grant.
+        refresh_token:
+          type: string
+          description: The refresh token (for `refresh_token` grant).
+        device_code:
+          type: string
+          description: The device code (for the device-code grant).
+    OAuthError:
+      type: object
+      description: OAuth 2.1 error response (RFC 6749 §5.2). The OAuth endpoints use this shape rather than the /v1 `ErrorResponse` envelope.
+      required:
+      - error
+      properties:
+        error:
+          type: string
+          enum:
+          - invalid_request
+          - invalid_client
+          - invalid_grant
+          - unauthorized_client
+          - unsupported_grant_type
+          - invalid_scope
+          - access_denied
+          - authorization_pending
+          - slow_down
+          - expired_token
+          - invalid_target
+          - server_error
+          description: A single ASCII error code from RFC 6749 §5.2 / RFC 8628 §3.5 / RFC 8693 §2.2.2.
+          example: invalid_grant
+        error_description:
+          type: string
+          description: Human-readable explanation of the error.
+        error_uri:
+          type: string
+          format: uri
+          description: URI of a human-readable web page with error information.
+    OAuthTokenResponse:
+      type: object
+      description: OAuth 2.1 access token response (RFC 6749 §5.1).
+      required:
+      - access_token
+      - token_type
+      - expires_in
+      properties:
+        access_token:
+          type: string
+          description: The issued access token (JWT).
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          enum:
+          - Bearer
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Access token lifetime in seconds.
+          example: 3600
+        scope:
+          type: string
+          description: Space-delimited list of granted scopes (may be narrower than requested).
+          example: routes:read routes:write
+        refresh_token:
+          type: string
+          description: A refresh token, when the grant issues one.
+        tenant:
+          type: string
+          format: uuid
+          description: The tenant the token is scoped to.
+          example: 3b5d7c9e-1f2a-4b6d-8c0e-2a4c6b8d0e1f
+        client_id:
+          type: string
+          description: The client the token was issued to.
+          example: kc_client_abc123
+    OAuthIntrospectionResponse:
+      type: object
+      description: OAuth token introspection response (RFC 7662 §2.2).
+      required:
+      - active
+      properties:
+        active:
+          type: boolean
+          description: Whether the token is currently active (not expired, not revoked, and known).
+          example: true
+        scope:
+          type: string
+          description: Space-delimited granted scopes.
+          example: routes:read
+        client_id:
+          type: string
+          example: kc_client_abc123
+        token_type:
+          type: string
+          example: Bearer
+        exp:
+          type: integer
+          description: Expiry time as epoch seconds.
+          example: 1735689600
+        iat:
+          type: integer
+          description: Issued-at time as epoch seconds.
+          example: 1735686000
+        sub:
+          type: string
+          description: Subject of the token.
+        require_dpop:
+          type: boolean
+          description: 'Non-standard member (RFC 7662 §2.2 permits extensions). `true` when the
+
+            token''s owning client is configured to require DPoP-bound tokens. A
+
+            resource server MUST refuse a token whose `cnf.jkt` is absent while this
+
+            is `true` — KnoxCall''s own data plane and `/v1` API both do.
+
+            '
+          example: false
+        tenant:
+          type: string
+          format: uuid
+          description: The tenant the token is scoped to.
   responses:
-    RateLimited:
-      description: 'Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
-
-        also present on non-429 responses whenever a limit is configured.
-
-        '
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-        X-RateLimit-Limit:
-          $ref: '#/components/headers/X-RateLimit-Limit'
-        X-RateLimit-Remaining:
-          $ref: '#/components/headers/X-RateLimit-Remaining'
-        X-RateLimit-Reset:
-          $ref: '#/components/headers/X-RateLimit-Reset'
-        Retry-After:
-          $ref: '#/components/headers/Retry-After'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: rate_limit_exceeded
-              message: API rate limit exceeded. Please retry later.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    ValidationError:
-      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            validation_error:
-              summary: Request body failed validation
-              value:
-                error:
-                  type: validation_error
-                  message: name and target_base_url are required.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            invalid_idempotency_key:
-              summary: Malformed idempotency key
-              value:
-                error:
-                  type: invalid_idempotency_key
-                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
     NotFound:
       description: The requested resource was not found.
       headers:
@@ -1489,6 +1382,113 @@ components:
                   type: invalid_api_key
                   message: Invalid API key.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+    RateLimited:
+      description: 'Too many requests. Retry after the indicated time. The `X-RateLimit-*` headers are
+
+        also present on non-429 responses whenever a limit is configured.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          $ref: '#/components/headers/Retry-After'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: rate_limit_exceeded
+              message: API rate limit exceeded. Please retry later.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+  headers:
+    X-RateLimit-Remaining:
+      description: 'Remaining requests in the current window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 999
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+    Retry-After:
+      description: Seconds to wait before retrying. Set on `429` responses.
+      schema:
+        type: integer
+      example: 30
+    X-RateLimit-Reset:
+      description: 'Epoch seconds at which the current rate-limit window resets. Emitted on every
+
+        response whenever a rate limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1735689600
+    X-RateLimit-Limit:
+      description: 'Maximum requests allowed per window. Emitted on every response whenever a rate
+
+        limit is configured for the authenticated key.
+
+        '
+      schema:
+        type: integer
+      example: 1000
   securitySchemes:
     OAuth2:
       type: oauth2

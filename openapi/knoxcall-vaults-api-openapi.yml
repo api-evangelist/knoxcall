@@ -718,104 +718,74 @@ paths:
           $ref: '#/components/responses/InternalError'
 components:
   schemas:
-    CreateVaultRequest:
+    RequestMeta:
       type: object
-      required:
-      - name
-      - token_format
+      description: Metadata included with every API response.
       properties:
-        name:
-          type: string
-          description: Vault name (slug, 1-64 chars).
-          example: payments-vault
-        token_format:
-          type: string
-          enum:
-          - generic
-          - pan
-          - ssn
-          - email
-          description: Token shape. Format-preserving formats (`pan`, `ssn`, `email`) require a paid plan. A value that looks like a payment card number (13-19 digits after stripping spaces and hyphens, and Luhn-valid) is refused by every format except `pan`.
-        custody_mode:
-          type: string
-          enum:
-          - managed
-          - dual
-          default: managed
-          description: Dual-custody vaults support only `token_format` `generic`.
-        default_ttl_seconds:
-          type:
-          - integer
-          - 'null'
-          minimum: 1
-          description: Default token lifetime. Omit/null for no expiry.
-        description:
-          type: string
-        metadata_jsonb:
-          type: object
-          additionalProperties: true
-        allowed_destinations:
-          type:
-          - array
-          - 'null'
-          items:
-            type: string
-          example:
-          - api.stripe.com
-          description: Hosts this vault's values may be sent to. Omit or `null` for unrestricted. **Required and non-empty when `token_format` is `pan`.** See the `Vault` schema for the matching rules.
-    VaultToken:
-      type: object
-      description: Token metadata as returned in list responses. The original value is never included.
-      properties:
-        id:
+        request_id:
           type: string
           format: uuid
-        token:
+          description: Unique identifier for this API request, useful for support and debugging.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - request_id
+    PaginationMeta:
+      type: object
+      description: Pagination metadata for list endpoints.
+      properties:
+        total:
+          type: integer
+          description: Total number of records matching the query.
+          example: 42
+        page:
+          type: integer
+          description: Current page number.
+          example: 1
+        per_page:
+          type: integer
+          description: Number of records per page.
+          example: 20
+        total_pages:
+          type: integer
+          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
+          example: 3
+        request_id:
           type: string
-          description: The token string that stands in for the original value.
-          example: tok_5H2K9QW3JF7M
-        expires_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        created_at:
-          type: string
-          format: date-time
-          example: '2025-03-15T10:30:00.000Z'
-        created_by_api_key_id:
-          type:
-          - string
-          - 'null'
-        created_by_user_id:
-          type:
-          - string
-          - 'null'
-        card_expires_on:
-          type:
-          - string
-          - 'null'
-          format: date
-          description: 'The LAST DAY of the payment card''s expiry month (`2029-07-31`), for a token in a `pan` vault whose tokenize call supplied one; `null` otherwise. NOT the token''s lifetime — that is `expires_at`. Tokens created before 2026-09-17 carry `null` and cannot be backfilled: the expiry was never captured, so they receive no `vault.token.expiring` event until they are tokenized again.'
-        card_funding_type:
-          type:
-          - string
-          - 'null'
-          enum:
-          - credit
-          - debit
-          - prepaid
-          - null
-          description: 'How the issuing bank funds the card, looked up from its first six digits at tokenize time for a token in a `pan` vault. Advisory metadata for your own routing and fraud rules — KnoxCall makes no decision on it. **Ships `null` on every token**: BIN data comes from a licensed table and KnoxCall has not licensed one, so treat both BIN fields as optional indefinitely. Also `null` for every non-`pan` vault, and for any BIN a future table does not carry.'
-        card_issuing_country:
-          type:
-          - string
-          - 'null'
-          minLength: 2
-          maxLength: 2
-          pattern: ^[A-Z]{2}$
-          example: IE
-          description: 'The issuing bank''s country as ISO 3166-1 alpha-2, upper case, looked up from the card''s first six digits at tokenize time. Same availability as `card_funding_type`: **`null` on every token today**, and `null` for any card whose issuer is not in the table.'
+          format: uuid
+          description: Unique identifier for this API request.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      required:
+      - total
+      - page
+      - per_page
+      - total_pages
+      - request_id
+    ErrorResponse:
+      type: object
+      description: Standard error response envelope.
+      properties:
+        error:
+          type: object
+          properties:
+            type:
+              type: string
+              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message.
+              example: name and target_base_url are required.
+            request_id:
+              type: string
+              format: uuid
+              description: Unique identifier for this request.
+              example: 550e8400-e29b-41d4-a716-446655440000
+          required:
+          - type
+          - message
+          - request_id
+      required:
+      - error
     Vault:
       type: object
       description: A tokenization vault with its own encryption key.
@@ -888,32 +858,6 @@ components:
           - api.stripe.com
           - '*.adyen.com'
           description: 'Destination binding. `null` means unrestricted. A non-empty array is the set of upstream hosts this vault''s values may be sent to via `POST /v1/proxy` or a Route; a send to any other host is refused with `403 vault_destination_refused` before the value is decrypted. Each entry is an exact hostname or a `*.suffix` wildcard. A wildcard is a suffix test: `*.stripe.com` matches `api.stripe.com` but not the bare apex `stripe.com` and not `api.stripe.com.evil.com`. **Required (non-empty) for `token_format` `pan`**, which additionally refuses every plain-read path — a card number leaves a `pan` vault only through detokenize-and-send.'
-    ErrorResponse:
-      type: object
-      description: Standard error response envelope.
-      properties:
-        error:
-          type: object
-          properties:
-            type:
-              type: string
-              description: 'Machine-readable error type. The set is OPEN — endpoints define specific types beyond the common ones below, so clients should branch on the types they know and fall back to the HTTP status class for anything unrecognized. Common values: authentication_required, invalid_api_key, wrong_key_type, subscription_inactive, rate_limit_exceeded, validation_error, forbidden, not_found, method_not_allowed (405, carries Allow), conflict, in_use, plan_limit, plan_feature, internal_error, dependency_unavailable (503, carries Retry-After), invalid_request, invalid_definition, not_cancellable, invalid_idempotency_key, idempotency_key_reuse, request_in_progress, system_client_protected, use_oauth, use_dpop_nonce (401 on /v1 and the data plane, 400 on POST /oauth/token; see "DPoP sender-constrained tokens").'
-              example: validation_error
-            message:
-              type: string
-              description: Human-readable error message.
-              example: name and target_base_url are required.
-            request_id:
-              type: string
-              format: uuid
-              description: Unique identifier for this request.
-              example: 550e8400-e29b-41d4-a716-446655440000
-          required:
-          - type
-          - message
-          - request_id
-      required:
-      - error
     VaultTokenCreated:
       type: object
       description: The result of tokenizing a value.
@@ -958,48 +902,6 @@ components:
           pattern: ^[A-Z]{2}$
           example: IE
           description: 'The issuing bank''s country as ISO 3166-1 alpha-2, upper case, looked up from the card''s first six digits at tokenize time. Same availability as `card_funding_type`: **`null` on every token today**, and `null` for any card whose issuer is not in the table.'
-    PaginationMeta:
-      type: object
-      description: Pagination metadata for list endpoints.
-      properties:
-        total:
-          type: integer
-          description: Total number of records matching the query.
-          example: 42
-        page:
-          type: integer
-          description: Current page number.
-          example: 1
-        per_page:
-          type: integer
-          description: Number of records per page.
-          example: 20
-        total_pages:
-          type: integer
-          description: Total number of pages, capped at the deepest page the 100,000-row offset ceiling allows -- `min(ceil(total / per_page), floor(100000 / per_page) + 1)`. When it is below `ceil(total / per_page)` the result set is larger than pagination can reach; narrow it with a filter.
-          example: 3
-        request_id:
-          type: string
-          format: uuid
-          description: Unique identifier for this API request.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - total
-      - page
-      - per_page
-      - total_pages
-      - request_id
-    RequestMeta:
-      type: object
-      description: Metadata included with every API response.
-      properties:
-        request_id:
-          type: string
-          format: uuid
-          description: Unique identifier for this API request, useful for support and debugging.
-          example: 550e8400-e29b-41d4-a716-446655440000
-      required:
-      - request_id
     VaultTokenDetail:
       type: object
       description: A detokenized token — includes the original value.
@@ -1032,117 +934,105 @@ components:
         crypto_key_version:
           type: integer
           description: The vault key version that encrypted this token.
-  headers:
-    X-Request-Id:
-      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
-
-        to the `request_id` field in the response body. Quote it when contacting support.
-
-        '
-      schema:
-        type: string
-        format: uuid
-      example: 550e8400-e29b-41d4-a716-446655440000
-    KnoxCall-Version:
-      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
-
-        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
-
-        '
-      schema:
-        type: string
-        pattern: ^\d{4}-\d{2}-\d{2}$
-      example: '2026-08-05'
-  parameters:
-    PerPageParam:
-      name: per_page
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 20
-      description: Number of items per page (max 100).
-    VaultNameOrId:
-      name: nameOrId
-      in: path
-      required: true
-      schema:
-        type: string
-      description: The vault name or UUID.
-      example: payments-vault
-    PageParam:
-      name: page
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        default: 1
-      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
-    IdempotencyKeyParam:
-      name: X-Idempotency-Key
-      in: header
-      required: false
-      schema:
-        type: string
-        maxLength: 255
-      description: 'Optional idempotency key so a retried mutating request is executed at most once.
-
-        The standard `Idempotency-Key` spelling is also accepted. Replaying a completed
-
-        request with the same key returns the original stored response with an
-
-        `X-Idempotent-Replay: true` header. A key still in progress returns
-
-        `409 request_in_progress`; the same key with a different body returns
-
-        `422 idempotency_key_reuse`; a malformed key returns `400 invalid_idempotency_key`.
-
-        '
-      example: 3f6c9b2e-1a4d-4c8e-9b0a-7d2e5f1c3a8b
-  responses:
-    ValidationError:
-      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          examples:
-            validation_error:
-              summary: Request body failed validation
-              value:
-                error:
-                  type: validation_error
-                  message: name and target_base_url are required.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-            invalid_idempotency_key:
-              summary: Malformed idempotency key
-              value:
-                error:
-                  type: invalid_idempotency_key
-                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
-                  request_id: 550e8400-e29b-41d4-a716-446655440000
-    Conflict:
-      description: A resource with the same unique identifier already exists, or the resource is in use.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
+    VaultToken:
+      type: object
+      description: Token metadata as returned in list responses. The original value is never included.
+      properties:
+        id:
+          type: string
+          format: uuid
+        token:
+          type: string
+          description: The token string that stands in for the original value.
+          example: tok_5H2K9QW3JF7M
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+          example: '2025-03-15T10:30:00.000Z'
+        created_by_api_key_id:
+          type:
+          - string
+          - 'null'
+        created_by_user_id:
+          type:
+          - string
+          - 'null'
+        card_expires_on:
+          type:
+          - string
+          - 'null'
+          format: date
+          description: 'The LAST DAY of the payment card''s expiry month (`2029-07-31`), for a token in a `pan` vault whose tokenize call supplied one; `null` otherwise. NOT the token''s lifetime — that is `expires_at`. Tokens created before 2026-09-17 carry `null` and cannot be backfilled: the expiry was never captured, so they receive no `vault.token.expiring` event until they are tokenized again.'
+        card_funding_type:
+          type:
+          - string
+          - 'null'
+          enum:
+          - credit
+          - debit
+          - prepaid
+          - null
+          description: 'How the issuing bank funds the card, looked up from its first six digits at tokenize time for a token in a `pan` vault. Advisory metadata for your own routing and fraud rules — KnoxCall makes no decision on it. **Ships `null` on every token**: BIN data comes from a licensed table and KnoxCall has not licensed one, so treat both BIN fields as optional indefinitely. Also `null` for every non-`pan` vault, and for any BIN a future table does not carry.'
+        card_issuing_country:
+          type:
+          - string
+          - 'null'
+          minLength: 2
+          maxLength: 2
+          pattern: ^[A-Z]{2}$
+          example: IE
+          description: 'The issuing bank''s country as ISO 3166-1 alpha-2, upper case, looked up from the card''s first six digits at tokenize time. Same availability as `card_funding_type`: **`null` on every token today**, and `null` for any card whose issuer is not in the table.'
+    CreateVaultRequest:
+      type: object
+      required:
+      - name
+      - token_format
+      properties:
+        name:
+          type: string
+          description: Vault name (slug, 1-64 chars).
+          example: payments-vault
+        token_format:
+          type: string
+          enum:
+          - generic
+          - pan
+          - ssn
+          - email
+          description: Token shape. Format-preserving formats (`pan`, `ssn`, `email`) require a paid plan. A value that looks like a payment card number (13-19 digits after stripping spaces and hyphens, and Luhn-valid) is refused by every format except `pan`.
+        custody_mode:
+          type: string
+          enum:
+          - managed
+          - dual
+          default: managed
+          description: Dual-custody vaults support only `token_format` `generic`.
+        default_ttl_seconds:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          description: Default token lifetime. Omit/null for no expiry.
+        description:
+          type: string
+        metadata_jsonb:
+          type: object
+          additionalProperties: true
+        allowed_destinations:
+          type:
+          - array
+          - 'null'
+          items:
+            type: string
           example:
-            error:
-              type: conflict
-              message: A route with this name already exists.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
+          - api.stripe.com
+          description: Hosts this vault's values may be sent to. Omit or `null` for unrestricted. **Required and non-empty when `token_format` is `pan`.** See the `Vault` schema for the matching rules.
+  responses:
     NotFound:
       description: The requested resource was not found.
       headers:
@@ -1159,12 +1049,8 @@ components:
               type: not_found
               message: Route not found.
               request_id: 550e8400-e29b-41d4-a716-446655440000
-    RequestInProgress:
-      description: 'A request with the same idempotency key is still being processed. Retry after a
-
-        short delay; do not change the request body.
-
-        '
+    Conflict:
+      description: A resource with the same unique identifier already exists, or the resource is in use.
       headers:
         X-Request-Id:
           $ref: '#/components/headers/X-Request-Id'
@@ -1176,8 +1062,8 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             error:
-              type: request_in_progress
-              message: A request with this idempotency key is already in progress.
+              type: conflict
+              message: A route with this name already exists.
               request_id: 550e8400-e29b-41d4-a716-446655440000
     InternalError:
       description: An unexpected server error occurred.
@@ -1194,26 +1080,6 @@ components:
             error:
               type: internal_error
               message: An unexpected error occurred.
-              request_id: 550e8400-e29b-41d4-a716-446655440000
-    IdempotencyKeyReuse:
-      description: 'The supplied idempotency key was already used for a request with a different body.
-
-        Idempotency keys may only be reused with an identical request.
-
-        '
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/X-Request-Id'
-        KnoxCall-Version:
-          $ref: '#/components/headers/KnoxCall-Version'
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error:
-              type: idempotency_key_reuse
-              message: This idempotency key was already used with a different request body.
               request_id: 550e8400-e29b-41d4-a716-446655440000
     Unauthorized:
       description: Authentication is required or the provided API key is invalid.
@@ -1241,6 +1107,140 @@ components:
                   type: invalid_api_key
                   message: Invalid API key.
                   request_id: 550e8400-e29b-41d4-a716-446655440000
+    RequestInProgress:
+      description: 'A request with the same idempotency key is still being processed. Retry after a
+
+        short delay; do not change the request body.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: request_in_progress
+              message: A request with this idempotency key is already in progress.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    IdempotencyKeyReuse:
+      description: 'The supplied idempotency key was already used for a request with a different body.
+
+        Idempotency keys may only be reused with an identical request.
+
+        '
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              type: idempotency_key_reuse
+              message: This idempotency key was already used with a different request body.
+              request_id: 550e8400-e29b-41d4-a716-446655440000
+    ValidationError:
+      description: The request failed validation (always `400 validation_error`). A malformed idempotency key returns `400 invalid_idempotency_key`.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/X-Request-Id'
+        KnoxCall-Version:
+          $ref: '#/components/headers/KnoxCall-Version'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validation_error:
+              summary: Request body failed validation
+              value:
+                error:
+                  type: validation_error
+                  message: name and target_base_url are required.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+            invalid_idempotency_key:
+              summary: Malformed idempotency key
+              value:
+                error:
+                  type: invalid_idempotency_key
+                  message: X-Idempotency-Key must be a non-empty string of at most 255 characters.
+                  request_id: 550e8400-e29b-41d4-a716-446655440000
+  headers:
+    KnoxCall-Version:
+      description: 'The dated API version (`YYYY-MM-DD`) that served this response. Equals the value
+
+        of the `KnoxCall-Version` request header when supplied, otherwise the newest version.
+
+        '
+      schema:
+        type: string
+        pattern: ^\d{4}-\d{2}-\d{2}$
+      example: '2026-08-05'
+    X-Request-Id:
+      description: 'Unique identifier for this request (UUID). Present on **every** response and equal
+
+        to the `request_id` field in the response body. Quote it when contacting support.
+
+        '
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination. Clamped server-side so the derived offset never exceeds 100,000 rows -- the effective maximum is `floor(100000 / per_page) + 1`, i.e. 1,001 at `per_page=100`. A larger value returns that last page, and `meta.page` reports it.
+    PerPageParam:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page (max 100).
+    VaultNameOrId:
+      name: nameOrId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: The vault name or UUID.
+      example: payments-vault
+    IdempotencyKeyParam:
+      name: X-Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+      description: 'Optional idempotency key so a retried mutating request is executed at most once.
+
+        The standard `Idempotency-Key` spelling is also accepted. Replaying a completed
+
+        request with the same key returns the original stored response with an
+
+        `X-Idempotent-Replay: true` header. A key still in progress returns
+
+        `409 request_in_progress`; the same key with a different body returns
+
+        `422 idempotency_key_reuse`; a malformed key returns `400 invalid_idempotency_key`.
+
+        '
+      example: 3f6c9b2e-1a4d-4c8e-9b0a-7d2e5f1c3a8b
   securitySchemes:
     OAuth2:
       type: oauth2
